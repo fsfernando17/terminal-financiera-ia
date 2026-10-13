@@ -54,28 +54,30 @@ api_key_oculta = st.secrets.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
 
-# LLAMADA ULTRA RÁPIDA EXCLUSIVA A MODELOS ACTIVOS EN TU PANEL DE GOOGLE AI STUDIO
+# CONEXIÓN ULTRA RÁPIDA A LOS MODELOS VIGENTES DE GOOGLE AI STUDIO
 def generar_respuesta_ia_rapida(client, prompt):
     """
-    Utiliza exactamente los modelos habilitados en tu consola de Google AI Studio:
-    gemini-3.8-flash -> gemini-3.7-flash -> gemini-3.6-flash
-    Sin esperas ni retardos innecesarios.
+    Usa estrictamente los modelos activos confirmados en la consola de Google AI Studio:
+    1. gemini-3.8-flash (Principal)
+    2. gemini-3.7-flash (Reserva 1)
+    3. gemini-3.6-flash (Reserva 2)
+    Sin retardos artificiales para garantizar la máxima velocidad de ejecución.
     """
-    modelos_activos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
-    ultimo_error = None
-
-    for modelo in modelos_activos:
+    modelos_validos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
+    
+    for modelo in modelos_validos:
         try:
             response = client.models.generate_content(
                 model=modelo,
                 contents=prompt
             )
-            return response.text
-        except Exception as e:
-            ultimo_error = e
-            continue  # Conmuta de inmediato sin pausas
-
-    raise Exception(f"Detalle de conexión API: {str(ultimo_error)}")
+            if response and response.text:
+                return response.text
+        except Exception:
+            # Si un modelo no responde o tiene un pico, conmuta en milisegundos al siguiente
+            continue
+            
+    raise Exception("No se pudo obtener respuesta de la API de Gemini. Verifique la API Key en los secretos de Streamlit.")
 
 
 # --- DICCIONARIOS MULTIMONEDA Y MERCADOS ---
@@ -176,7 +178,7 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                 info = stock.info
                 
                 if df.empty:
-                    st.error(f"⚠️ No se encontraron datos para el símbolo '{ticker_final}'. Verifique que el ticker sea válido.")
+                    st.error(f"⚠️ No se encontraron datos para el símbolo '{ticker_final}'. Verifique que el ticker sea válido en Yahoo Finance.")
                 else:
                     tasa = conf_moneda["factor"]
                     simb = conf_moneda["simbolo"]
@@ -186,10 +188,14 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                     precio_actual = precio_actual_raw * tasa
                     df['Close_Moneda'] = df['Close'] * tasa
                     
-                    # Métricas Fundamentales
+                    # Métricas Fundamentales formateadas
                     market_cap = info.get('marketCap', 0) * tasa if info.get('marketCap') else 0
-                    pe_ratio = info.get('trailingPE', 'N/A')
-                    pb_ratio = info.get('priceToBook', 'N/A')
+                    pe_ratio_raw = info.get('trailingPE', 'N/A')
+                    pe_ratio = f"{pe_ratio_raw:.2f}" if isinstance(pe_ratio_raw, (int, float)) else str(pe_ratio_raw)
+                    
+                    pb_ratio_raw = info.get('priceToBook', 'N/A')
+                    pb_ratio = f"{pb_ratio_raw:.2f}" if isinstance(pb_ratio_raw, (int, float)) else str(pb_ratio_raw)
+                    
                     dividend_yield = info.get('dividendYield', 0)
                     dividend_str = f"{dividend_yield*100:.2f}%" if dividend_yield else "0.00%"
                     profit_margin = info.get('profitMargins', 0)
@@ -281,9 +287,46 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
 
                     st.markdown("---")
 
-                    # PROMPT EJECUTIVO Y RESUMIDO PARA MÁXIMA VELOCIDAD
+                    # PROMPT EJECUTIVO Y DIRECTO PARA VELOCIDAD DE GENERACIÓN
                     paquete_analisis = f"""
                     Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
                     Precio Actual: {simb} {precio_actual:,.2f}
                     Capital disponible del inversor: {simb} {capital_input:,.2f}
                     Moneda seleccionada: {moneda_sel}
+                    Horizonte Temporal: {horizonte}
+                    Perfil de Riesgo: {perfil_riesgo}
+                    
+                    MÉTRICAS FUNDAMENTALES:
+                    - Ratio P/E (PER): {pe_ratio}
+                    - Ratio P/B: {pb_ratio}
+                    - Dividend Yield: {dividend_str}
+                    - Margen de Beneficio Neto: {margin_str}
+                    
+                    MÉTRICAS TÉCNICAS Y ESTADÍSTICAS:
+                    - Volatilidad Anualizada: {volatilidad_anual:.2%}
+                    - Value at Risk (VaR 95% diario): {var_95:.2%}
+                    - Media Móvil (50 ruedas): {simb} {sma_50:,.2f}
+                    - Media Móvil (200 ruedas): {simb} {sma_200:,.2f}
+                    """
+
+                    prompt_ia = f"""
+                    Actúa como un Asesor Financiero Senior y Analista de Inversiones Bursátiles.
+                    Proporciona un dictamen sintético, directo y profesional estructurado así:
+
+                    {paquete_analisis}
+
+                    PUNTOS A RESPONDER (Breve y al grano):
+                    1. **Diagnóstico Fundamental y Técnico:** Evalúa la valoración (PER, P/B, Medias Móviles).
+                    2. **Análisis de Capital:** Opina si el capital de {simb} {capital_input:,.2f} es óptimo para el horizonte de {horizonte}.
+                    3. **Riesgos Macro:** Riesgos clave a vigilar.
+                    4. **Veredicto:** Recomendación estratégica concreta.
+                    """
+
+                    # Generación ultra rápida usando exclusivamente la lista oficial de tu consola
+                    informe_ia = generar_respuesta_ia_rapida(client, prompt_ia)
+
+                    st.markdown("### 📋 Dictamen Estratégico del Asistente")
+                    st.markdown(informe_ia)
+
+            except Exception as e:
+                st.error(f"Error al procesar el análisis: {str(e)}")
