@@ -208,53 +208,82 @@ client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
 
 def limpiar_texto_markdown(texto):
-    if not texto:
-        return ""
-    texto = str(texto).replace("`", "")
-    return texto.strip()
+  if not texto:
+    return ""
+  texto = str(texto).replace("`", "")
+  return texto.strip()
 
 
 # MODELOS OFICIALES DE GOOGLE AI STUDIO
 def generar_respuesta_ia_rapida(client, prompt):
-    modelos_validos = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
-    
-    config = types.GenerateContentConfig(
-        temperature=0.1,
-        max_output_tokens=500,
-        response_mime_type="application/json"
-    )
+  modelos_validos = [
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+      "gemini-flash-latest",
+  ]
 
-    for modelo in modelos_validos:
-        try:
-            response = client.models.generate_content(
-                model=modelo,
-                contents=prompt,
-                config=config
-            )
-            if response and response.text:
-                return response.text
-        except Exception:
-            continue
+  config = types.GenerateContentConfig(
+      temperature=0.1, max_output_tokens=500, response_mime_type="application/json"
+  )
 
-    return None
+  for modelo in modelos_validos:
+    try:
+      response = client.models.generate_content(
+          model=modelo, contents=prompt, config=config
+      )
+      if response and response.text:
+        return response.text
+    except Exception:
+      continue
+
+  return None
 
 
 def parse_json_respuesta(text):
-    if not text:
-        return None
-    cleaned = text.strip()
-    cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'\s*```$', '', cleaned)
-    try:
-        return json.loads(cleaned)
-    except Exception:
-        match = re.search(r'\{.*\}', cleaned, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                pass
+  if not text:
     return None
+  cleaned = text.strip()
+  cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+  cleaned = re.sub(r"\s*```$", "", cleaned)
+  try:
+    return json.loads(cleaned)
+  except Exception:
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if match:
+      try:
+        return json.loads(match.group(0))
+      except Exception:
+        pass
+  return None
+
+
+# SIMULACIÓN DE MONTE CARLO - MOVIMIENTO BROWNIANO GEOMÉTRICO (GBM) UNIVERSAL
+def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500):
+    # Calcular parámetros estadísticos
+    mu_diario = retornos_diarios.mean()
+    sigma_diario = retornos_diarios.std()
+
+    # Movimiento Browniano Geométrico con deriva ajustada
+    drift = mu_diario - 0.5 * (sigma_diario ** 2)
+
+    # Matriz de precios (dias_proy + 1 filas, num_simulaciones columnas)
+    matriz_precios = np.zeros((dias_proy + 1, num_simulaciones))
+    matriz_precios[0] = precio_inicial
+
+    # Generar todas las simulaciones a la vez vectorizadamente
+    choques = np.random.normal(0, 1, (dias_proy, num_simulaciones))
+    retornos_simulados = np.exp(drift + sigma_diario * choques)
+    
+    for t in range(1, dias_proy + 1):
+        matriz_precios[t] = matriz_precios[t - 1] * retornos_simulados[t - 1]
+
+    # Extraer Mediana (Línea Central) y Percentiles 10/90 (Banda de Confianza)
+    mediana = np.median(matriz_precios, axis=1)
+    percentil_10 = np.percentile(matriz_precios, 10, axis=1)
+    percentil_90 = np.percentile(matriz_precios, 90, axis=1)
+
+    return mediana, percentil_10, percentil_90
 
 
 # --- DICCIONARIOS Y CONFIGURACIONES ---
@@ -271,7 +300,7 @@ DIVISAS = {
     "CAD": "Dólar Canadiense (CAD)",
     "CNY": "Yuan Chino (CNY)",
     "KRW": "Won Surcoreano (KRW)",
-    "AED": "Dirham de EAU (AED)"
+    "AED": "Dirham de EAU (AED)",
 }
 
 TICKER_MAP = {
@@ -343,648 +372,1020 @@ MERCADOS = {
 
 
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
-    tasa_destino = TASAS_CAMBIO_USD[moneda_destino_key]
+  tasa_destino = TASAS_CAMBIO_USD[moneda_destino_key]
 
-    base_upper = str(moneda_base_asset).upper()
-    if "PEN" in base_upper or "SOL" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["PEN (S/.)"]
-    elif "BRL" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["BRL (R$)"]
-    elif "CLP" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["CLP ($)"]
-    elif "MXN" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["MXN ($)"]
-    else:
-        tasa_base_usd = 1.0
+  base_upper = str(moneda_base_asset).upper()
+  if "PEN" in base_upper or "SOL" in base_upper:
+    tasa_base_usd = TASAS_CAMBIO_USD["PEN (S/.)"]
+  elif "BRL" in base_upper:
+    tasa_base_usd = TASAS_CAMBIO_USD["BRL (R$)"]
+  elif "CLP" in base_upper:
+    tasa_base_usd = TASAS_CAMBIO_USD["CLP ($)"]
+  elif "MXN" in base_upper:
+    tasa_base_usd = TASAS_CAMBIO_USD["MXN ($)"]
+  else:
+    tasa_base_usd = 1.0
 
-    return (1.0 / tasa_base_usd) * tasa_destino
+  return (1.0 / tasa_base_usd) * tasa_destino
 
 
-# FUNCIÓN ROBUSTA DE DESCARGA E HISTORIAL DE DIVISAS (FOREX 5 AÑOS)
 def obtener_historial_forex(base_curr, target_curr):
-    try:
-        if base_curr == target_curr:
-            dates = pd.date_range(end=pd.Timestamp.now(), periods=1260, freq='B')
-            return pd.DataFrame({'Close': 1.0}, index=dates)
-        
-        # 1. Ticker directo BASE + TARGET
-        ticker_direct = f"{base_curr}{target_curr}=X"
-        df = yf.Ticker(ticker_direct).history(period="5y")
-        if not df.empty and len(df) > 10:
-            return df[['Close']]
-        
-        # 2. Ticker inverso TARGET + BASE
-        ticker_inverse = f"{target_curr}{base_curr}=X"
-        df_inv = yf.Ticker(ticker_inverse).history(period="5y")
-        if not df_inv.empty and len(df_inv) > 10:
-            df_inv['Close'] = 1.0 / df_inv['Close']
-            return df_inv[['Close']]
-        
-        # 3. Cruce vía USD
-        df_base = None
-        if base_curr != "USD":
-            df_base = yf.Ticker(f"{base_curr}USD=X").history(period="5y")
-            if df_base.empty or len(df_base) <= 10:
-                df_b_inv = yf.Ticker(f"USD{base_curr}=X").history(period="5y")
-                if not df_b_inv.empty and len(df_b_inv) > 10:
-                    df_base = df_b_inv.copy()
-                    df_base['Close'] = 1.0 / df_b_inv['Close']
-        
-        df_target = None
-        if target_curr != "USD":
-            df_target = yf.Ticker(f"{target_curr}USD=X").history(period="5y")
-            if df_target.empty or len(df_target) <= 10:
-                df_t_inv = yf.Ticker(f"USD{target_curr}=X").history(period="5y")
-                if not df_t_inv.empty and len(df_t_inv) > 10:
-                    df_target = df_t_inv.copy()
-                    df_target['Close'] = 1.0 / df_t_inv['Close']
-        
-        if base_curr == "USD" and df_target is not None and not df_target.empty:
-            df_res = pd.DataFrame(index=df_target.index)
-            df_res['Close'] = 1.0 / df_target['Close']
-            return df_res
-        elif target_curr == "USD" and df_base is not None and not df_base.empty:
-            df_res = pd.DataFrame(index=df_base.index)
-            df_res['Close'] = df_base['Close']
-            return df_res
-        elif df_base is not None and df_target is not None and not df_base.empty and not df_target.empty:
-            df_comb = pd.concat([df_base['Close'], df_target['Close']], axis=1, keys=['b', 't']).dropna()
-            df_res = pd.DataFrame(index=df_comb.index)
-            df_res['Close'] = df_comb['b'] / df_comb['t']
-            return df_res
-            
-    except Exception:
-        pass
-    return pd.DataFrame()
+  try:
+    if base_curr == target_curr:
+      dates = pd.date_range(end=pd.Timestamp.now(), periods=1260, freq="B")
+      return pd.DataFrame({"Close": 1.0}, index=dates)
+
+    ticker_direct = f"{base_curr}{target_curr}=X"
+    df = yf.Ticker(ticker_direct).history(period="5y")
+    if not df.empty and len(df) > 10:
+      return df[["Close"]]
+
+    ticker_inverse = f"{target_curr}{base_curr}=X"
+    df_inv = yf.Ticker(ticker_inverse).history(period="5y")
+    if not df_inv.empty and len(df_inv) > 10:
+      df_inv["Close"] = 1.0 / df_inv["Close"]
+      return df_inv[["Close"]]
+
+    df_base = None
+    if base_curr != "USD":
+      df_base = yf.Ticker(f"{base_curr}USD=X").history(period="5y")
+      if df_base.empty or len(df_base) <= 10:
+        df_b_inv = yf.Ticker(f"USD{base_curr}=X").history(period="5y")
+        if not df_b_inv.empty and len(df_b_inv) > 10:
+          df_base = df_b_inv.copy()
+          df_base["Close"] = 1.0 / df_b_inv["Close"]
+
+    df_target = None
+    if target_curr != "USD":
+      df_target = yf.Ticker(f"{target_curr}USD=X").history(period="5y")
+      if df_target.empty or len(df_target) <= 10:
+        df_t_inv = yf.Ticker(f"USD{target_curr}=X").history(period="5y")
+        if not df_t_inv.empty and len(df_t_inv) > 10:
+          df_target = df_t_inv.copy()
+          df_target["Close"] = 1.0 / df_t_inv["Close"]
+
+    if base_curr == "USD" and df_target is not None and not df_target.empty:
+      df_res = pd.DataFrame(index=df_target.index)
+      df_res["Close"] = 1.0 / df_target["Close"]
+      return df_res
+    elif target_curr == "USD" and df_base is not None and not df_base.empty:
+      df_res = pd.DataFrame(index=df_base.index)
+      df_res["Close"] = df_base["Close"]
+      return df_res
+    elif (
+        df_base is not None
+        and df_target is not None
+        and not df_base.empty
+        and not df_target.empty
+    ):
+      df_comb = pd.concat(
+          [df_base["Close"], df_target["Close"]], axis=1, keys=["b", "t"]
+      ).dropna()
+      df_res = pd.DataFrame(index=df_comb.index)
+      df_res["Close"] = df_comb["b"] / df_comb["t"]
+      return df_res
+
+  except Exception:
+    pass
+  return pd.DataFrame()
 
 
-def generar_fallback_json_forex(base_curr, target_curr, rate_actual, horizonte, proposito, volatilidad_anual):
-    return {
-        "diagnostico": f"El par {base_curr}/{target_curr} cotiza a un tipo de cambio de {rate_actual:,.4f}. La trayectoria de 5 años refleja una volatilidad anualizada del {volatilidad_anual:.2%}.",
-        "viabilidad": f"Para un horizonte de {horizonte} con propósito de {proposito}, se requiere evaluar la diferencial de tasas de interés entre ambos bancos centrales.",
-        "riesgos": "1. Decisiones de política monetaria y tasas de referencia\n2. Volatilidad en precios de commodities e inflación\n3. Eventos geopolíticos e incertidumbre electoral",
-        "veredicto": "MANTENER EN OBSERVACIÓN",
-        "fundamento": f"Se recomienda vigilar los soportes y resistencias clave del par {base_curr}/{target_curr} antes de ejecutar coberturas o conversiones de capital masivas."
-    }
+def generar_fallback_json_forex(
+    base_curr, target_curr, rate_actual, horizonte, proposito, volatilidad_anual
+):
+  return {
+      "diagnostico": (
+          f"El par {base_curr}/{target_curr} cotiza a un tipo de cambio de"
+          f" {rate_actual:,.4f}. La trayectoria de 5 años refleja una"
+          f" volatilidad anualizada del {volatilidad_anual:.2%}."
+      ),
+      "viabilidad": (
+          f"Para un horizonte de {horizonte} con propósito de {proposito}, se"
+          " requiere evaluar el diferencial de tasas de interés entre ambos"
+          " bancos centrales."
+      ),
+      "riesgos": (
+          "1. Decisiones de política monetaria y tasas de referencia\n2."
+          " Volatilidad en commodities e inflación\n3. Incertidumbre"
+          " geopolítica y regulaciones cambiarias"
+      ),
+      "veredicto": "MANTENER EN OBSERVACIÓN",
+      "fundamento": (
+          f"Se recomienda vigilar los soportes y resistencias del par"
+          f" {base_curr}/{target_curr} antes de ejecutar conversiones de"
+          " capital masivas."
+      ),
+  }
 
 
-def generar_fallback_json_acciones(simb, capital_input, precio_actual, perfil_riesgo, horizonte, pe_ratio, volatilidad_anual):
-    es_insuficiente = capital_input < precio_actual
-    es_riesgoso = (perfil_riesgo == "Conservador" and volatilidad_anual > 0.25)
-    
-    if es_insuficiente or es_riesgoso:
-        veredicto = "DESESTIMAR"
-        fundamento = f"El capital disponible ({simb} {capital_input:,.2f}) es insuficiente para adquirir 1 acción completa ({simb} {precio_actual:,.2f}) o la volatilidad excede la tolerancia del perfil {perfil_riesgo}."
-    else:
-        veredicto = "MANTENER EN OBSERVACIÓN"
-        fundamento = f"El activo presenta métricas aceptables con un PER de {pe_ratio}, pero requiere monitoreo según el horizonte de {horizonte}."
+def generar_fallback_json_acciones(
+    simb,
+    capital_input,
+    precio_actual,
+    perfil_riesgo,
+    horizonte,
+    pe_ratio,
+    volatilidad_anual,
+):
+  es_insuficiente = capital_input < precio_actual
+  es_riesgoso = perfil_riesgo == "Conservador" and volatilidad_anual > 0.25
 
-    return {
-        "diagnostico": f"El activo cotiza a un precio de {simb} {precio_actual:,.2f} con un PER de {pe_ratio} evaluado sobre la curva de los últimos 5 años.",
-        "viabilidad": f"Capital disponible de {simb} {capital_input:,.2f} frente al precio unitario de {simb} {precio_actual:,.2f} en un horizonte de {horizonte}.",
-        "riesgos": "1. Sensibilidad a tasas de interés\n2. Volatilidad sectorial y macroeconómica\n3. Variaciones en la demanda global",
-        "veredicto": veredicto,
-        "fundamento": fundamento
-    }
+  if es_insuficiente or es_riesgoso:
+    veredicto = "DESESTIMAR"
+    fundamento = (
+        f"El capital disponible ({simb} {capital_input:,.2f}) es insuficiente"
+        f" para adquirir 1 acción completa ({simb} {precio_actual:,.2f}) o la"
+        f" volatilidad excede la tolerancia del perfil {perfil_riesgo}."
+    )
+  else:
+    veredicto = "MANTENER EN OBSERVACIÓN"
+    fundamento = (
+        f"El activo presenta métricas aceptables con un PER de {pe_ratio}, pero"
+        f" requiere monitoreo según el horizonte de {horizonte}."
+    )
+
+  return {
+      "diagnostico": (
+          f"El activo cotiza a un precio de {simb} {precio_actual:,.2f} con un"
+          f" PER de {pe_ratio} evaluado sobre la curva de los últimos 5 años."
+      ),
+      "viabilidad": (
+          f"Capital disponible de {simb} {capital_input:,.2f} frente al precio"
+          f" unitario de {simb} {precio_actual:,.2f} en un horizonte de"
+          f" {horizonte}."
+      ),
+      "riesgos": (
+          "1. Sensibilidad a tasas de interés\n2. Volatilidad sectorial y"
+          " macroeconómica\n3. Variaciones en la demanda global"
+      ),
+      "veredicto": veredicto,
+      "fundamento": fundamento,
+  }
 
 
 # --- ENCABEZADO PRINCIPAL ---
 st.title("📈 Terminal Inteligente de Inversiones & Forex")
 st.markdown(
     "<p style='color: #94a3b8; font-size: 1.05rem; margin-bottom: 20px;'>"
-    "Plataforma cuantitativa, econométrica y analítica para la evaluación estratégica de acciones globales y mercado de divisas (Análisis a 5 Años).</p>",
+    "Plataforma cuantitativa, econométrica y analítica para la evaluación"
+    " estratégica de acciones globales y mercado de divisas (Análisis a 5"
+    " Años).</p>",
     unsafe_allow_html=True,
 )
 
 # --- ESTRUCTURA DE PESTAÑAS (TABS) ---
-tab_acciones, tab_forex = st.tabs(["📊 Análisis Accionario", "🔀 Comparativa de Divisas (Forex)"])
+tab_acciones, tab_forex = st.tabs(
+    ["📊 Análisis Accionario", "🔀 Comparativa de Divisas (Forex)"]
+)
 
 # ==============================================================================
 # PESTAÑA 1: ANÁLISIS ACCIONARIO
 # ==============================================================================
 with tab_acciones:
-    with st.container(border=True):
-        st.subheader("⚙️ Parámetros Operativos de Inversión Accionaria")
+  with st.container(border=True):
+    st.subheader("⚙️ Parámetros Operativos de Inversión Accionaria")
 
-        col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-        with col1:
-            mercado_sel = st.selectbox("🌍 Mercado de Origen:", list(MERCADOS.keys()), key="stock_mercado")
+    with col1:
+      mercado_sel = st.selectbox(
+          "🌍 Mercado de Origen:",
+          list(MERCADOS.keys()),
+          key="stock_mercado",
+      )
 
-        dic_acciones = MERCADOS[mercado_sel]
+    dic_acciones = MERCADOS[mercado_sel]
 
-        with col2:
-            opcion_accion = st.selectbox(
-                "📊 Selección de Acción / Ticker:",
-                list(dic_acciones.keys()),
-                format_func=lambda x: (
-                    f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}"
-                ),
-                key="stock_accion"
-            )
+    with col2:
+      opcion_accion = st.selectbox(
+          "📊 Selección de Acción / Ticker:",
+          list(dic_acciones.keys()),
+          format_func=lambda x: (
+              f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}"
+          ),
+          key="stock_accion",
+      )
 
-            if opcion_accion == "🔍 Buscar otro Ticker manualmente":
-                ticker_final = st.text_input(
-                    "Ingrese Ticker oficial de Yahoo Finance (ej: AMD, MELI, PBR):",
-                    value="AAPL",
-                    key="stock_ticker_manual"
-                ).upper()
-                nombre_empresa = ticker_final
-            else:
-                ticker_final = opcion_accion
-                nombre_empresa = dic_acciones[opcion_accion]
+      if opcion_accion == "🔍 Buscar otro Ticker manualmente":
+        ticker_final = st.text_input(
+            "Ingrese Ticker oficial de Yahoo Finance (ej: AMD, MELI, PBR):",
+            value="AAPL",
+            key="stock_ticker_manual",
+        ).upper()
+        nombre_empresa = ticker_final
+      else:
+        ticker_final = opcion_accion
+        nombre_empresa = dic_acciones[opcion_accion]
 
-        with col3:
-            moneda_sel = st.selectbox("💵 Moneda de Operación:", list(TASAS_CAMBIO_USD.keys()), key="stock_moneda")
+    with col3:
+      moneda_sel = st.selectbox(
+          "💵 Moneda de Operación:",
+          list(TASAS_CAMBIO_USD.keys()),
+          key="stock_moneda",
+      )
 
-        simb = SIMBOLOS_MONEDA[moneda_sel]
-        monto_min = MINIMOS_MONEDA[moneda_sel]
+    simb = SIMBOLOS_MONEDA[moneda_sel]
+    monto_min = MINIMOS_MONEDA[moneda_sel]
 
-        col4, col5, col6 = st.columns(3)
+    col4, col5, col6 = st.columns(3)
 
-        with col4:
-            capital_input = st.number_input(
-                f"💰 Capital Disponible ({simb}):",
-                min_value=monto_min,
-                value=monto_min * 10,
-                step=monto_min,
-                key="stock_capital"
-            )
+    with col4:
+      capital_input = st.number_input(
+          f"💰 Capital Disponible ({simb}):",
+          min_value=monto_min,
+          value=monto_min * 10,
+          step=monto_min,
+          key="stock_capital",
+      )
 
-        with col5:
-            horizonte = st.selectbox(
-                "⏱️ Horizonte Temporal:",
-                [
-                    "Corto Plazo (1 a 3 meses)",
-                    "Mediano Plazo (6 meses a 1 año)",
-                    "Largo Plazo (1 año a más)",
-                ],
-                key="stock_horizonte"
-            )
+    with col5:
+      horizonte = st.selectbox(
+          "⏱️ Horizonte Temporal:",
+          [
+              "Corto Plazo (1 a 3 meses)",
+              "Mediano Plazo (6 meses a 1 año)",
+              "Largo Plazo (1 año a más)",
+          ],
+          key="stock_horizonte",
+      )
 
-        with col6:
-            perfil_riesgo = st.selectbox(
-                "🛡️ Perfil del Inversor:", ["Conservador", "Moderado", "Agresivo"], key="stock_perfil"
-            )
+    with col6:
+      perfil_riesgo = st.selectbox(
+          "🛡️ Perfil del Inversor:",
+          ["Conservador", "Moderado", "Agresivo"],
+          key="stock_perfil",
+      )
 
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+  st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-    if st.button("🚀 Ejecutar Análisis Multidimensional Accionario", use_container_width=True, key="btn_stock"):
-        if not api_key_oculta or not client:
-            st.error("⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta GEMINI_API_KEY).")
+  if st.button(
+      "🚀 Ejecutar Análisis Multidimensional Accionario",
+      use_container_width=True,
+      key="btn_stock",
+  ):
+    if not api_key_oculta or not client:
+      st.error(
+          "⚠️ El servicio de Inteligencia Artificial no está configurado en el"
+          " servidor (Falta GEMINI_API_KEY)."
+      )
+    else:
+      datos_cargados = False
+      try:
+        search_ticker = TICKER_MAP.get(ticker_final, ticker_final)
+        stock = yf.Ticker(search_ticker)
+        df = stock.history(period="5y")
+
+        if df.empty and search_ticker.endswith(".LM"):
+          alt_ticker = search_ticker.replace(".LM", "")
+          stock = yf.Ticker(alt_ticker)
+          df = stock.history(period="5y")
+
+        info = stock.info
+
+        if df.empty:
+          st.error(
+              "⚠️ No se encontraron registros financieros para el símbolo"
+              f" '{ticker_final}'. Verifique el ticker en Yahoo Finance."
+          )
         else:
-            datos_cargados = False
-            try:
-                search_ticker = TICKER_MAP.get(ticker_final, ticker_final)
-                stock = yf.Ticker(search_ticker)
-                df = stock.history(period="5y")
-                
-                if df.empty and search_ticker.endswith(".LM"):
-                    alt_ticker = search_ticker.replace(".LM", "")
-                    stock = yf.Ticker(alt_ticker)
-                    df = stock.history(period="5y")
+          datos_cargados = True
+          currency_base = info.get("currency", "USD")
+          factor_conv = obtener_factor_conversion(currency_base, moneda_sel)
 
-                info = stock.info
+          precio_actual_raw = df["Close"].iloc[-1]
+          precio_actual = precio_actual_raw * factor_conv
+          df["Close_Moneda"] = df["Close"] * factor_conv
 
-                if df.empty:
-                    st.error(f"⚠️ No se encontraron registros financieros para el símbolo '{ticker_final}'. Verifique el ticker en Yahoo Finance.")
-                else:
-                    datos_cargados = True
-                    currency_base = info.get("currency", "USD")
-                    factor_conv = obtener_factor_conversion(currency_base, moneda_sel)
+          market_cap = (
+              info.get("marketCap", 0) * factor_conv
+              if info.get("marketCap")
+              else 0
+          )
+          pe_ratio_raw = info.get("trailingPE", "N/A")
+          pe_ratio = (
+              f"{pe_ratio_raw:.2f}"
+              if isinstance(pe_ratio_raw, (int, float))
+              else str(pe_ratio_raw)
+          )
 
-                    precio_actual_raw = df["Close"].iloc[-1]
-                    precio_actual = precio_actual_raw * factor_conv
-                    df["Close_Moneda"] = df["Close"] * factor_conv
+          pb_ratio_raw = info.get("priceToBook", "N/A")
+          pb_ratio = (
+              f"{pb_ratio_raw:.2f}"
+              if isinstance(pb_ratio_raw, (int, float))
+              else str(pb_ratio_raw)
+          )
 
-                    market_cap = info.get("marketCap", 0) * factor_conv if info.get("marketCap") else 0
-                    pe_ratio_raw = info.get("trailingPE", "N/A")
-                    pe_ratio = f"{pe_ratio_raw:.2f}" if isinstance(pe_ratio_raw, (int, float)) else str(pe_ratio_raw)
+          dividend_yield = info.get("dividendYield", 0)
+          dividend_str = (
+              f"{dividend_yield*100:.2f}%" if dividend_yield else "0.00%"
+          )
+          profit_margin = info.get("profitMargins", 0)
+          margin_str = (
+              f"{profit_margin*100:.2f}%" if profit_margin else "N/A"
+          )
+          sector = info.get("sector", "General / No especificado")
 
-                    pb_ratio_raw = info.get("priceToBook", "N/A")
-                    pb_ratio = f"{pb_ratio_raw:.2f}" if isinstance(pb_ratio_raw, (int, float)) else str(pb_ratio_raw)
+          df["Retorno_Diario"] = df["Close"].pct_change()
+          volatilidad_anual = df["Retorno_Diario"].std() * np.sqrt(252)
+          retorno_medio_diario = df["Retorno_Diario"].mean()
+          var_95 = np.percentile(df["Retorno_Diario"].dropna(), 5)
 
-                    dividend_yield = info.get("dividendYield", 0)
-                    dividend_str = f"{dividend_yield*100:.2f}%" if dividend_yield else "0.00%"
-                    profit_margin = info.get("profitMargins", 0)
-                    margin_str = f"{profit_margin*100:.2f}%" if profit_margin else "N/A"
-                    sector = info.get("sector", "General / No especificado")
+          sma_50 = df["Close_Moneda"].rolling(window=50).mean().iloc[-1]
+          sma_200 = (
+              df["Close_Moneda"].rolling(window=200).mean().iloc[-1]
+              if len(df) >= 200
+              else sma_50
+          )
 
-                    df["Retorno_Diario"] = df["Close"].pct_change()
-                    volatilidad_anual = df["Retorno_Diario"].std() * np.sqrt(252)
-                    retorno_medio_diario = df["Retorno_Diario"].mean()
-                    var_95 = np.percentile(df["Retorno_Diario"].dropna(), 5)
+          # KPIs
+          st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
+          c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+          c_m1.metric(
+              f"Precio Actual ({simb})", f"{simb} {precio_actual:,.2f}"
+          )
+          c_m2.metric("PER (Price / Earnings)", f"{pe_ratio}")
+          c_m3.metric(
+              "Volatilidad Anualizada (5A)", f"{volatilidad_anual:.2%}"
+          )
+          c_m4.metric("Margen Beneficio Neto", f"{margin_str}")
 
-                    sma_50 = df["Close_Moneda"].rolling(window=50).mean().iloc[-1]
-                    sma_200 = df["Close_Moneda"].rolling(window=200).mean().iloc[-1] if len(df) >= 200 else sma_50
+          c_m5, c_m6, c_m7, c_m8 = st.columns(4)
+          c_m5.metric(
+              f"Cap. de Mercado ({simb})",
+              f"{simb} {market_cap:,.0f}" if market_cap else "N/A",
+          )
+          c_m6.metric("Ratio P/B", f"{pb_ratio}")
+          c_m7.metric("Rendimiento Dividendo", f"{dividend_str}")
+          c_m8.metric("VaR 95% Diarios (5A)", f"{var_95:.2%}")
 
-                    # KPIs
-                    st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
-                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
-                    c_m1.metric(f"Precio Actual ({simb})", f"{simb} {precio_actual:,.2f}")
-                    c_m2.metric("PER (Price / Earnings)", f"{pe_ratio}")
-                    c_m3.metric("Volatilidad Anualizada (5A)", f"{volatilidad_anual:.2%}")
-                    c_m4.metric("Margen Beneficio Neto", f"{margin_str}")
+          st.markdown("---")
 
-                    c_m5, c_m6, c_m7, c_m8 = st.columns(4)
-                    c_m5.metric(f"Cap. de Mercado ({simb})", f"{simb} {market_cap:,.0f}" if market_cap else "N/A")
-                    c_m6.metric("Ratio P/B", f"{pb_ratio}")
-                    c_m7.metric("Rendimiento Dividendo", f"{dividend_str}")
-                    c_m8.metric("VaR 95% Diarios (5A)", f"{var_95:.2%}")
+          # Gráfico Plotly con Monte Carlo (GBM)
+          st.markdown(
+              "### 📈 Comportamiento Histórico a 5 Años & Proyección"
+              f" Monte Carlo ({horizonte})"
+          )
+          dias_proy = (
+              60
+              if "1 a 3 meses" in horizonte
+              else (180 if "6 meses a 1 año" in horizonte else 365)
+          )
 
-                    st.markdown("---")
+          mediana, p10, p90 = simular_monte_carlo_gbm(
+              precio_actual, df["Retorno_Diario"].dropna(), dias_proy
+          )
 
-                    # Gráfico Plotly
-                    st.markdown(f"### 📈 Comportamiento Histórico a 5 Años & Proyección ({horizonte})")
-                    dias_proy = 60 if "1 a 3 meses" in horizonte else (180 if "6 meses a 1 año" in horizonte else 365)
+          fechas_hist = df.index
+          precios_hist = df["Close_Moneda"]
+          fechas_futuras = pd.date_range(
+              start=df.index[-1], periods=dias_proy + 1, freq="B"
+          )
 
-                    np.random.seed(42)
-                    cambios_simulados = np.random.normal(retorno_medio_diario, df["Retorno_Diario"].std(), dias_proy)
-                    precios_futuros = [precio_actual]
-                    for cambio in cambios_simulados:
-                        precios_futuros.append(precios_futuros[-1] * (1 + cambio))
+          fig = go.Figure()
+          fig.add_trace(
+              go.Scatter(
+                  x=fechas_hist,
+                  y=precios_hist,
+                  mode="lines",
+                  name="Histórico Real (5 Años)",
+                  line=dict(color="#00e676", width=2.0),
+              )
+          )
 
-                    fechas_hist = df.index
-                    precios_hist = df["Close_Moneda"]
-                    fechas_futuras = pd.date_range(start=df.index[-1], periods=dias_proy + 1, freq="B")
+          # Banda Superior de Confianza (Percentil 90)
+          fig.add_trace(
+              go.Scatter(
+                  x=fechas_futuras,
+                  y=p90,
+                  mode="lines",
+                  name="Escenario Optimista (P90)",
+                  line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash"),
+                  showlegend=True,
+              )
+          )
 
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=fechas_hist, y=precios_hist, mode="lines", name="Histórico Real (5 Años)", line=dict(color="#00e676", width=2.0)))
-                    fig.add_trace(go.Scatter(x=fechas_futuras, y=precios_futuros, mode="lines", name="Proyección Econométrica", line=dict(color="#e040fb", width=2.5, dash="dash")))
+          # Banda Inferior de Confianza (Percentil 10) con sombreado
+          fig.add_trace(
+              go.Scatter(
+                  x=fechas_futuras,
+                  y=p10,
+                  mode="lines",
+                  name="Escenario Pesimista (P10)",
+                  line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"),
+                  fill="tonexty",
+                  fillcolor="rgba(56, 189, 248, 0.05)",
+                  showlegend=True,
+              )
+          )
 
-                    fig.update_layout(
-                        title=dict(text=f"Evolución de Cotización Real (5 Años) y Proyección - {ticker_final}", font=dict(size=16, color="#f9fafb")),
-                        xaxis=dict(title="Fecha / Periodo de Proyección", gridcolor="#1e293b"),
-                        yaxis=dict(title=f"Precio del Activo ({simb})", gridcolor="#1e293b", zeroline=False, autorange=True),
-                        template="plotly_dark",
-                        paper_bgcolor="#0f172a",
-                        plot_bgcolor="#0f172a",
-                        height=500,
-                        hovermode="x unified",
-                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(15,23,42,0.8)")
-                    )
+          # Mediana Esperada (Proyección Central)
+          fig.add_trace(
+              go.Scatter(
+                  x=fechas_futuras,
+                  y=mediana,
+                  mode="lines",
+                  name="Proyección Central Probable",
+                  line=dict(color="#e040fb", width=2.5),
+              )
+          )
 
-                    st.plotly_chart(fig, use_container_width=True)
+          fig.update_layout(
+              title=dict(
+                  text=(
+                      "Evolución de Cotización Real (5 Años) y Proyección GBM Monte"
+                      f" Carlo - {ticker_final}"
+                  ),
+                  font=dict(size=16, color="#f9fafb"),
+              ),
+              xaxis=dict(
+                  title="Fecha / Periodo de Proyección", gridcolor="#1e293b"
+              ),
+              yaxis=dict(
+                  title=f"Precio del Activo ({simb})",
+                  gridcolor="#1e293b",
+                  zeroline=False,
+                  autorange=True,
+              ),
+              template="plotly_dark",
+              paper_bgcolor="#0f172a",
+              plot_bgcolor="#0f172a",
+              height=500,
+              hovermode="x unified",
+              legend=dict(
+                  yanchor="top",
+                  y=0.99,
+                  xanchor="left",
+                  x=0.01,
+                  bgcolor="rgba(15,23,42,0.8)",
+              ),
+          )
 
-                    st.markdown("""
-                        <div class="disclaimer-box">
-                            <strong>⚠️ Aviso Legal / Descargo de Responsabilidad:</strong> 
-                            Este modelo genera pronósticos estadísticos basándose estrictamente en datos pasados de los últimos 5 años y condiciones actuales de mercado. 
-                            No es 100% exacto y está expuesto a volatilidad implícita y eventos macroeconómicos.
-                        </div>
-                    """, unsafe_allow_html=True)
+          st.plotly_chart(fig, use_container_width=True)
 
-                    st.markdown("---")
+          st.markdown(
+              """
+              <div class="disclaimer-box">
+                  <strong>⚠️ Aviso Legal / Descargo de Responsabilidad:</strong> 
+                  Este modelo genera pronósticos estadísticos basándose estrictamente en datos pasados de los últimos 5 años y simulaciones estocásticas Monte Carlo (GBM). 
+                  No es 100% exacto y está expuesto a la volatilidad implícita y eventos macroeconómicos imprevistos.
+              </div>
+              """,
+              unsafe_allow_html=True,
+          )
 
-            except Exception as e:
-                st.error(f"Error procesando métricas financieras: {str(e)}")
+          st.markdown("---")
 
-            if datos_cargados:
-                st.markdown("## 📋 Dictamen Estratégico de Inversión Accionaria")
+      except Exception as e:
+        st.error(f"Error procesando métricas financieras: {str(e)}")
 
-                paquete_analisis = f"""
-                Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
-                Precio Actual: {simb} {precio_actual:,.2f} | Capital: {simb} {capital_input:,.2f}
-                Moneda: {moneda_sel} | Horizonte: {horizonte} | Perfil: {perfil_riesgo}
-                PER: {pe_ratio} | P/B: {pb_ratio} | Volatilidad 5A: {volatilidad_anual:.2%} | VaR 95%: {var_95:.2%}
-                SMA 50: {simb} {sma_50:,.2f} | SMA 200: {simb} {sma_200:,.2f}
-                """
+      if datos_cargados:
+        st.markdown("## 📋 Dictamen Estratégico de Inversión Accionaria")
 
-                prompt_ia = f"""
-                Genera respuesta ÚNICAMENTE en JSON sintético:
-                {paquete_analisis}
+        paquete_analisis = f"""
+        Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
+        Precio Actual: {simb} {precio_actual:,.2f} | Capital: {simb} {capital_input:,.2f}
+        Moneda: {moneda_sel} | Horizonte: {horizonte} | Perfil: {perfil_riesgo}
+        PER: {pe_ratio} | P/B: {pb_ratio} | Volatilidad 5A: {volatilidad_anual:.2%} | VaR 95%: {var_95:.2%}
+        SMA 50: {simb} {sma_50:,.2f} | SMA 200: {simb} {sma_200:,.2f}
+        """
 
-                JSON OBLIGATORIO:
-                {{
-                  "diagnostico": "Análisis síntesis de PER, P/B y SMA 50/200 a 5 años.",
-                  "viabilidad": "Evalúa capital {simb} {capital_input:,.2f} vs precio {simb} {precio_actual:,.2f} y perfil {perfil_riesgo}.",
-                  "riesgos": "1. Macro\\n2. Sectorial\\n3. Operativo",
-                  "veredicto": "DESESTIMAR",
-                  "fundamento": "Explicación directa y ejecutiva."
-                }}
-                REGLAS: Sin cursivas ni asteriscos. 'veredicto' sólo COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN.
-                """
+        prompt_ia = f"""
+        Genera respuesta ÚNICAMENTE en JSON sintético:
+        {paquete_analisis}
 
-                with st.spinner("🤖 Generando dictamen estratégico..."):
-                    raw_response = generar_respuesta_ia_rapida(client, prompt_ia)
-                    data_json = parse_json_respuesta(raw_response)
+        JSON OBLIGATORIO:
+        {{
+          "diagnostico": "Análisis síntesis de PER, P/B y SMA 50/200 a 5 años.",
+          "viabilidad": "Evalúa capital {simb} {capital_input:,.2f} vs precio {simb} {precio_actual:,.2f} y perfil {perfil_riesgo}.",
+          "riesgos": "1. Macro\\n2. Sectorial\\n3. Operativo",
+          "veredicto": "DESESTIMAR",
+          "fundamento": "Explicación directa y ejecutiva."
+        }}
+        REGLAS: Sin cursivas ni asteriscos. 'veredicto' sólo COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN.
+        """
 
-                    if not data_json:
-                        data_json = generar_fallback_json_acciones(simb, capital_input, precio_actual, perfil_riesgo, horizonte, pe_ratio, volatilidad_anual)
+        with st.spinner("🤖 Generando dictamen estratégico..."):
+          raw_response = generar_respuesta_ia_rapida(client, prompt_ia)
+          data_json = parse_json_respuesta(raw_response)
 
-                    col1, col2, col3, col4 = st.columns(4)
+          if not data_json:
+            data_json = generar_fallback_json_acciones(
+                simb,
+                capital_input,
+                precio_actual,
+                perfil_riesgo,
+                horizonte,
+                pe_ratio,
+                volatilidad_anual,
+            )
 
-                    with col1:
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">1. Diagnóstico Fundamental y Técnico</div>
-                            <div class="analysis-card-body">{limpiar_texto_markdown(data_json.get("diagnostico", ""))}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          col1, col2, col3, col4 = st.columns(4)
 
-                    with col2:
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">2. Viabilidad del Capital y Horizonte</div>
-                            <div class="analysis-card-body">{limpiar_texto_markdown(data_json.get("viabilidad", ""))}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          with col1:
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">1. Diagnóstico Fundamental y Técnico</div>
+                    <div class="analysis-card-body">{limpiar_texto_markdown(data_json.get("diagnostico", ""))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    with col3:
-                        riesgos_txt = limpiar_texto_markdown(data_json.get("riesgos", "")).replace('\n', '<br>')
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">3. Factores de Riesgo Macro</div>
-                            <div class="analysis-card-body">{riesgos_txt}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          with col2:
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">2. Viabilidad del Capital y Horizonte</div>
+                    <div class="analysis-card-body">{limpiar_texto_markdown(data_json.get("viabilidad", ""))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    with col4:
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">4. Veredicto Estratégico</div>
-                            <div class="analysis-card-body">{limpiar_texto_markdown(data_json.get("fundamento", ""))}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          with col3:
+            riesgos_txt = limpiar_texto_markdown(
+                data_json.get("riesgos", "")
+            ).replace("\n", "<br>")
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">3. Factores de Riesgo Macro</div>
+                    <div class="analysis-card-body">{riesgos_txt}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+          with col4:
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">4. Veredicto Estratégico</div>
+                    <div class="analysis-card-body">{limpiar_texto_markdown(data_json.get("fundamento", ""))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    bot_col1, bot_col2 = st.columns([3, 1])
+          st.markdown(
+              "<div style='margin-top: 20px;'></div>", unsafe_allow_html=True
+          )
 
-                    with bot_col1:
-                        st.markdown(f"""
-                        <div class="decision-container">
-                            <div class="analysis-card-title" style="font-size: 1.12rem; margin-bottom: 10px;">🎯 Decisión y Fundamento Ejecutivo</div>
-                            <div class="analysis-card-body" style="font-size: 0.96rem; line-height: 1.65; color: #f8fafc;">
-                                {limpiar_texto_markdown(data_json.get("fundamento", ""))}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          bot_col1, bot_col2 = st.columns([3, 1])
 
-                    with bot_col2:
-                        veredicto_clean = str(data_json.get("veredicto", "MANTENER EN OBSERVACIÓN")).upper()
-                        if "COMPRAR" in veredicto_clean and "DESESTIMAR" not in veredicto_clean:
-                            badge_class = "decision-comprar"
-                            badge_icon = "🟢"
-                            badge_text = "COMPRAR"
-                        elif "DESESTIMAR" in veredicto_clean:
-                            badge_class = "decision-desestimar"
-                            badge_icon = "🔴"
-                            badge_text = "DESESTIMAR"
-                        else:
-                            badge_class = "decision-observacion"
-                            badge_icon = "🟡"
-                            badge_text = "MANTENER EN OBSERVACIÓN"
+          with bot_col1:
+            st.markdown(
+                f"""
+                <div class="decision-container">
+                    <div class="analysis-card-title" style="font-size: 1.12rem; margin-bottom: 10px;">🎯 Decisión y Fundamento Ejecutivo</div>
+                    <div class="analysis-card-body" style="font-size: 0.96rem; line-height: 1.65; color: #f8fafc;">
+                        {limpiar_texto_markdown(data_json.get("fundamento", ""))}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                        st.markdown(f"""
-                        <div class="decision-badge-box {badge_class}">
-                            <div style="font-size: 2.2rem; margin-bottom: 6px;">{badge_icon}</div>
-                            <div style="font-weight: 800; letter-spacing: 0.08em;">{badge_text}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          with bot_col2:
+            veredicto_clean = str(
+                data_json.get("veredicto", "MANTENER EN OBSERVACIÓN")
+            ).upper()
+            if (
+                "COMPRAR" in veredicto_clean
+                and "DESESTIMAR" not in veredicto_clean
+            ):
+              badge_class = "decision-comprar"
+              badge_icon = "🟢"
+              badge_text = "COMPRAR"
+            elif "DESESTIMAR" in veredicto_clean:
+              badge_class = "decision-desestimar"
+              badge_icon = "🔴"
+              badge_text = "DESESTIMAR"
+            else:
+              badge_class = "decision-observacion"
+              badge_icon = "🟡"
+              badge_text = "MANTENER EN OBSERVACIÓN"
+
+            st.markdown(
+                f"""
+                <div class="decision-badge-box {badge_class}">
+                    <div style="font-size: 2.2rem; margin-bottom: 6px;">{badge_icon}</div>
+                    <div style="font-weight: 800; letter-spacing: 0.08em;">{badge_text}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 # ==============================================================================
 # PESTAÑA 2: COMPARATIVA DE DIVISAS (FOREX)
 # ==============================================================================
 with tab_forex:
-    with st.container(border=True):
-        st.subheader("⚙️ Parámetros Operativos de Evaluación Cambiaria")
+  with st.container(border=True):
+    st.subheader("⚙️ Parámetros Operativos de Evaluación Cambiaria")
 
-        col_fx1, col_fx2, col_fx3 = st.columns(3)
+    col_fx1, col_fx2, col_fx3 = st.columns(3)
 
-        with col_fx1:
-            base_curr = st.selectbox("🔀 Moneda de Origen (Base):", list(DIVISAS.keys()), index=0, format_func=lambda x: DIVISAS[x], key="fx_base")
+    with col_fx1:
+      base_curr = st.selectbox(
+          "🔀 Moneda de Origen (Base):",
+          list(DIVISAS.keys()),
+          index=0,
+          format_func=lambda x: DIVISAS[x],
+          key="fx_base",
+      )
 
-        with col_fx2:
-            target_curr = st.selectbox("🎯 Moneda Destino (Objetivo):", list(DIVISAS.keys()), index=1, format_func=lambda x: DIVISAS[x], key="fx_target")
+    with col_fx2:
+      target_curr = st.selectbox(
+          "🎯 Moneda Destino (Objetivo):",
+          list(DIVISAS.keys()),
+          index=1,
+          format_func=lambda x: DIVISAS[x],
+          key="fx_target",
+      )
 
-        with col_fx3:
-            monto_fx = st.number_input(f"💰 Monto de Conversión ({base_curr}):", min_value=1.0, value=1000.0, step=100.0, key="fx_monto")
+    with col_fx3:
+      monto_fx = st.number_input(
+          f"💰 Monto de Conversión ({base_curr}):",
+          min_value=1.0,
+          value=1000.0,
+          step=100.0,
+          key="fx_monto",
+      )
 
-        col_fx4, col_fx5 = st.columns(2)
+    col_fx4, col_fx5 = st.columns(2)
 
-        with col_fx4:
-            horizonte_fx = st.selectbox(
-                "⏱️ Horizonte Temporal:",
-                [
-                    "Corto Plazo (1 a 3 meses)",
-                    "Mediano Plazo (6 meses a 1 año)",
-                    "Largo Plazo (1 año a más)"
-                ],
-                key="fx_horizonte"
-            )
+    with col_fx4:
+      horizonte_fx = st.selectbox(
+          "⏱️ Horizonte Temporal:",
+          [
+              "Corto Plazo (1 a 3 meses)",
+              "Mediano Plazo (6 meses a 1 año)",
+              "Largo Plazo (1 año a más)",
+          ],
+          key="fx_horizonte",
+      )
 
-        with col_fx5:
-            proposito_fx = st.selectbox(
-                "🎯 Propósito de la Evaluación:",
-                [
-                    "Cobertura de Riesgo Cambiario (Hedging)",
-                    "Operación de Comercio Exterior / Importación",
-                    "Inversión / Especulación Forex",
-                    "Ahorro / Reserva de Valor"
-                ],
-                key="fx_proposito"
-            )
+    with col_fx5:
+      proposito_fx = st.selectbox(
+          "🎯 Propósito de la Evaluación:",
+          [
+              "Cobertura de Riesgo Cambiario (Hedging)",
+              "Operación de Comercio Exterior / Importación",
+              "Inversión / Especulación Forex",
+              "Ahorro / Reserva de Valor",
+          ],
+          key="fx_proposito",
+      )
 
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+  st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-    if st.button("🚀 Ejecutar Análisis Multidimensional de Divisas", use_container_width=True, key="btn_forex"):
-        if not api_key_oculta or not client:
-            st.error("⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta GEMINI_API_KEY).")
+  if st.button(
+      "🚀 Ejecutar Análisis Multidimensional de Divisas",
+      use_container_width=True,
+      key="btn_forex",
+  ):
+    if not api_key_oculta or not client:
+      st.error(
+          "⚠️ El servicio de Inteligencia Artificial no está configurado en el"
+          " servidor (Falta GEMINI_API_KEY)."
+      )
+    else:
+      datos_fx_cargados = False
+      try:
+        df_fx = obtener_historial_forex(base_curr, target_curr)
+
+        if df_fx.empty:
+          st.error(
+              "⚠️ No se pudo obtener el historial de tipo de cambio para la"
+              f" paridad {base_curr}/{target_curr}. Intente con otra"
+              " combinación."
+          )
         else:
-            datos_fx_cargados = False
-            try:
-                df_fx = obtener_historial_forex(base_curr, target_curr)
+          datos_fx_cargados = True
+          rate_actual = df_fx["Close"].iloc[-1]
+          df_fx["Retorno_Diario"] = df_fx["Close"].pct_change()
 
-                if df_fx.empty:
-                    st.error(f"⚠️ No se pudo obtener el historial de tipo de cambio para la paridad {base_curr}/{target_curr}. Intente con otra combinación.")
-                else:
-                    datos_fx_cargados = True
-                    rate_actual = df_fx['Close'].iloc[-1]
-                    df_fx['Retorno_Diario'] = df_fx['Close'].pct_change()
+          volatilidad_anual = df_fx["Retorno_Diario"].std() * np.sqrt(252)
+          retorno_medio_diario = df_fx["Retorno_Diario"].mean()
+          var_95 = np.percentile(df_fx["Retorno_Diario"].dropna(), 5)
 
-                    volatilidad_anual = df_fx['Retorno_Diario'].std() * np.sqrt(252)
-                    retorno_medio_diario = df_fx['Retorno_Diario'].mean()
-                    var_95 = np.percentile(df_fx['Retorno_Diario'].dropna(), 5)
+          min_52w = (
+              df_fx["Close"].tail(252).min()
+              if len(df_fx) >= 252
+              else df_fx["Close"].min()
+          )
+          max_52w = (
+              df_fx["Close"].tail(252).max()
+              if len(df_fx) >= 252
+              else df_fx["Close"].max()
+          )
 
-                    min_52w = df_fx['Close'].tail(252).min() if len(df_fx) >= 252 else df_fx['Close'].min()
-                    max_52w = df_fx['Close'].tail(252).max() if len(df_fx) >= 252 else df_fx['Close'].max()
+          sma_50 = df_fx["Close"].rolling(window=50).mean().iloc[-1]
+          sma_200 = (
+              df_fx["Close"].rolling(window=200).mean().iloc[-1]
+              if len(df_fx) >= 200
+              else sma_50
+          )
 
-                    sma_50 = df_fx['Close'].rolling(window=50).mean().iloc[-1]
-                    sma_200 = df_fx['Close'].rolling(window=200).mean().iloc[-1] if len(df_fx) >= 200 else sma_50
+          rate_inicial_5y = df_fx["Close"].iloc[0]
+          var_5y_pct = (
+              (rate_actual - rate_inicial_5y) / rate_inicial_5y
+          ) * 100
 
-                    rate_inicial_5y = df_fx['Close'].iloc[0]
-                    var_5y_pct = ((rate_actual - rate_inicial_5y) / rate_inicial_5y) * 100
+          # KPIs Cambiarios
+          st.markdown(
+              "### 📊 Panel de Indicadores Clave - Paridad"
+              f" {base_curr} / {target_curr}"
+          )
 
-                    # KPIs Cambiarios
-                    st.markdown(f"### 📊 Panel de Indicadores Clave - Paridad {base_curr} / {target_curr}")
+          c_fx1, c_fx2, c_fx3, c_fx4 = st.columns(4)
+          c_fx1.metric(
+              f"Tipo de Cambio Actual ({target_curr})", f"{rate_actual:,.4f}"
+          )
+          c_fx2.metric(
+              "Monto Convertido Estimado",
+              f"{monto_fx * rate_actual:,.2f} {target_curr}",
+          )
+          c_fx3.metric("Volatilidad Anualizada (5A)", f"{volatilidad_anual:.2%}")
+          c_fx4.metric("Variación a 5 Años", f"{var_5y_pct:+.2f}%")
 
-                    c_fx1, c_fx2, c_fx3, c_fx4 = st.columns(4)
-                    c_fx1.metric(f"Tipo de Cambio Actual ({target_curr})", f"{rate_actual:,.4f}")
-                    c_fx2.metric("Monto Convertido Estimado", f"{monto_fx * rate_actual:,.2f} {target_curr}")
-                    c_fx3.metric("Volatilidad Anualized (5A)", f"{volatilidad_anual:.2%}")
-                    c_fx4.metric("Variación a 5 Años", f"{var_5y_pct:+.2f}%")
+          c_fx5, c_fx6, c_fx7, c_fx8 = st.columns(4)
+          c_fx5.metric("Promedio Móvil SMA 50d", f"{sma_50:,.4f}")
+          c_fx6.metric("Promedio Móvil SMA 200d", f"{sma_200:,.4f}")
+          c_fx7.metric(
+              "Rango 52 Semanas (Mín - Máx)",
+              f"{min_52w:,.2f} - {max_52w:,.2f}",
+          )
+          c_fx8.metric("VaR 95% Diarios (Riesgo FX)", f"{var_95:.2%}")
 
-                    c_fx5, c_fx6, c_fx7, c_fx8 = st.columns(4)
-                    c_fx5.metric("Promedio Móvil SMA 50d", f"{sma_50:,.4f}")
-                    c_fx6.metric("Promedio Móvil SMA 200d", f"{sma_200:,.4f}")
-                    c_fx7.metric("Rango 52 Semanas (Mín - Máx)", f"{min_52w:,.2f} - {max_52w:,.2f}")
-                    c_fx8.metric("VaR 95% Diarios (Riesgo FX)", f"{var_95:.2%}")
+          st.markdown("---")
 
-                    st.markdown("---")
+          # Gráfico Plotly FX con Monte Carlo (GBM)
+          st.markdown(
+              "### 📈 Comportamiento Histórico a 5 Años & Proyección"
+              f" Monte Carlo ({horizonte_fx})"
+          )
 
-                    # Gráfico Plotly FX
-                    st.markdown(f"### 📈 Comportamiento Histórico a 5 Años & Proyección Econométrica ({horizonte_fx})")
+          dias_proy = (
+              60
+              if "1 a 3 meses" in horizonte_fx
+              else (180 if "6 meses a 1 año" in horizonte_fx else 365)
+          )
 
-                    dias_proy = 60 if "1 a 3 meses" in horizonte_fx else (180 if "6 meses a 1 año" in horizonte_fx else 365)
+          mediana_fx, p10_fx, p90_fx = simular_monte_carlo_gbm(
+              rate_actual, df_fx["Retorno_Diario"].dropna(), dias_proy
+          )
 
-                    np.random.seed(42)
-                    cambios_simulados = np.random.normal(retorno_medio_diario, df_fx['Retorno_Diario'].std(), dias_proy)
-                    precios_futuros = [rate_actual]
-                    for cambio in cambios_simulados:
-                        precios_futuros.append(precios_futuros[-1] * (1 + cambio))
+          fechas_hist = df_fx.index
+          precios_hist = df_fx["Close"]
+          fechas_futuras = pd.date_range(
+              start=df_fx.index[-1], periods=dias_proy + 1, freq="B"
+          )
 
-                    fechas_hist = df_fx.index
-                    precios_hist = df_fx['Close']
-                    fechas_futuras = pd.date_range(start=df_fx.index[-1], periods=dias_proy + 1, freq="B")
+          fig_fx = go.Figure()
+          fig_fx.add_trace(
+              go.Scatter(
+                  x=fechas_hist,
+                  y=precios_hist,
+                  mode="lines",
+                  name=f"Tipo de Cambio Real ({base_curr}/{target_curr})",
+                  line=dict(color="#00e676", width=2.0),
+              )
+          )
 
-                    fig_fx = go.Figure()
-                    fig_fx.add_trace(go.Scatter(x=fechas_hist, y=precios_hist, mode="lines", name=f"Tipo de Cambio Real ({base_curr}/{target_curr})", line=dict(color="#00e676", width=2.0)))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=precios_futuros, mode="lines", name="Proyección Econométrica FX", line=dict(color="#e040fb", width=2.5, dash="dash")))
+          # Banda Superior de Confianza (P90)
+          fig_fx.add_trace(
+              go.Scatter(
+                  x=fechas_futuras,
+                  y=p90_fx,
+                  mode="lines",
+                  name="Escenario Optimista (P90)",
+                  line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash"),
+                  showlegend=True,
+              )
+          )
 
-                    fig_fx.update_layout(
-                        title=dict(text=f"Evolución de Paridad Cambiaria (5 Años) y Proyección - {base_curr}/{target_curr}", font=dict(size=16, color="#f9fafb")),
-                        xaxis=dict(title="Fecha / Periodo de Proyección", gridcolor="#1e293b"),
-                        yaxis=dict(title=f"Tipo de Cambio ({base_curr}/{target_curr})", gridcolor="#1e293b", zeroline=False, autorange=True),
-                        template="plotly_dark",
-                        paper_bgcolor="#0f172a",
-                        plot_bgcolor="#0f172a",
-                        height=500,
-                        hovermode="x unified",
-                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(15,23,42,0.8)")
-                    )
+          # Banda Inferior de Confianza (P10) con sombreado
+          fig_fx.add_trace(
+              go.Scatter(
+                  x=fechas_futuras,
+                  y=p10_fx,
+                  mode="lines",
+                  name="Escenario Pesimista (P10)",
+                  line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"),
+                  fill="tonexty",
+                  fillcolor="rgba(56, 189, 248, 0.05)",
+                  showlegend=True,
+              )
+          )
 
-                    st.plotly_chart(fig_fx, use_container_width=True)
+          # Mediana Esperada (Proyección Central)
+          fig_fx.add_trace(
+              go.Scatter(
+                  x=fechas_futuras,
+                  y=mediana_fx,
+                  mode="lines",
+                  name="Proyección Central Probable FX",
+                  line=dict(color="#e040fb", width=2.5),
+              )
+          )
 
-                    st.markdown("""
-                        <div class="disclaimer-box">
-                            <strong>⚠️ Aviso Legal / Descargo de Responsabilidad FX:</strong> 
-                            Las cotizaciones cambiarias están sujetas a alta volatilidad por decisiones de política monetaria (Fed, BCE, BCRP, etc.), intervenciones cambiarias y eventos macroeconómicos. 
-                            Este modelo econométrico no constituye asesoramiento financiero ni garantía de rendimiento.
-                        </div>
-                    """, unsafe_allow_html=True)
+          fig_fx.update_layout(
+              title=dict(
+                  text=(
+                      "Evolución de Paridad Cambiaria (5 Años) y Proyección"
+                      f" GBM Monte Carlo - {base_curr}/{target_curr}"
+                  ),
+                  font=dict(size=16, color="#f9fafb"),
+              ),
+              xaxis=dict(
+                  title="Fecha / Periodo de Proyección", gridcolor="#1e293b"
+              ),
+              yaxis=dict(
+                  title=f"Tipo de Cambio ({base_curr}/{target_curr})",
+                  gridcolor="#1e293b",
+                  zeroline=False,
+                  autorange=True,
+              ),
+              template="plotly_dark",
+              paper_bgcolor="#0f172a",
+              plot_bgcolor="#0f172a",
+              height=500,
+              hovermode="x unified",
+              legend=dict(
+                  yanchor="top",
+                  y=0.99,
+                  xanchor="left",
+                  x=0.01,
+                  bgcolor="rgba(15,23,42,0.8)",
+              ),
+          )
 
-                    st.markdown("---")
+          st.plotly_chart(fig_fx, use_container_width=True)
 
-            except Exception as e:
-                st.error(f"Error procesando análisis cambiario: {str(e)}")
+          st.markdown(
+              """
+              <div class="disclaimer-box">
+                  <strong>⚠️ Aviso Legal / Descargo de Responsabilidad FX:</strong> 
+                  Las cotizaciones cambiarias están sujetas a alta volatilidad por decisiones de política monetaria (Fed, BCE, BCRP, etc.), intervenciones cambiarias y eventos macroeconómicos. 
+                  Este modelo estocástico de Monte Carlo no constituye un asesoramiento financiero ni garantía de rendimiento.
+              </div>
+              """,
+              unsafe_allow_html=True,
+          )
 
-            if datos_fx_cargados:
-                st.markdown(f"## 📋 Dictamen Estratégico de Evaluación Cambiaria ({base_curr} / {target_curr})")
+          st.markdown("---")
 
-                paquete_analisis_fx = f"""
-                Par de Divisas: {base_curr} / {target_curr} ({DIVISAS[base_curr]} frente a {DIVISAS[target_curr]})
-                Tipo de Cambio Actual: 1 {base_curr} = {rate_actual:,.4f} {target_curr}
-                Monto Evaluado: {monto_fx:,.2f} {base_curr} (= {monto_fx * rate_actual:,.2f} {target_curr})
-                Horizonte Temporal: {horizonte_fx} | Propósito: {proposito_fx}
-                Volatilidad Anualizada (5A): {volatilidad_anual:.2%} | Variación 5A: {var_5y_pct:+.2f}%
-                VaR 95% Diario: {var_95:.2%} | SMA 50d: {sma_50:,.4f} | SMA 200d: {sma_200:,.4f}
-                Rango 52 Semanas: Mínimo {min_52w:,.4f} - Máximo {max_52w:,.4f}
-                """
+      except Exception as e:
+        st.error(f"Error procesando análisis cambiario: {str(e)}")
 
-                prompt_fx = f"""
-                Actúa como un Economista Senior especializado en Mercado Forex y Macroeconomía Global.
-                Evalúa el par {base_curr}/{target_curr} y genera respuesta ÚNICAMENTE en JSON sintético:
+      if datos_fx_cargados:
+        st.markdown(
+            "## 📋 Dictamen Estratégico de Evaluación Cambiaria"
+            f" ({base_curr} / {target_curr})"
+        )
 
-                INFORMACIÓN A EVALUAR:
-                {paquete_analisis_fx}
+        paquete_analisis_fx = f"""
+        Par de Divisas: {base_curr} / {target_curr} ({DIVISAS[base_curr]} frente a {DIVISAS[target_curr]})
+        Tipo de Cambio Actual: 1 {base_curr} = {rate_actual:,.4f} {target_curr}
+        Monto Evaluado: {monto_fx:,.2f} {base_curr} (= {monto_fx * rate_actual:,.2f} {target_curr})
+        Horizonte Temporal: {horizonte_fx} | Propósito: {proposito_fx}
+        Volatilidad Anualizada (5A): {volatilidad_anual:.2%} | Variación 5A: {var_5y_pct:+.2f}%
+        VaR 95% Diario: {var_95:.2%} | SMA 50d: {sma_50:,.4f} | SMA 200d: {sma_200:,.4f}
+        Rango 52 Semanas: Mínimo {min_52w:,.4f} - Máximo {max_52w:,.4f}
+        """
 
-                JSON OBLIGATORIO:
-                {{
-                  "diagnostico": "Análisis macroeconómico síntesis, diferencial de tasas e indicadores técnicos (SMA 50/200) a 5 años.",
-                  "viabilidad": "Evaluación de conveniencia de conversión / cobertura para {monto_fx:,.2f} {base_curr} en el horizonte {horizonte_fx}.",
-                  "riesgos": "1. Política Monetaria / Tasas\\n2. Inflación y Commodities\\n3. Geopolítica / FX",
-                  "veredicto": "FORTALECIMIENTO DE BASE",
-                  "fundamento": "Explicación directa, sintética y ejecutiva."
-                }}
-                REGLAS: Sin cursivas ni asteriscos. 'veredicto' sólo FORTALECIMIENTO DE BASE, DEBILITAMIENTO DE BASE o MANTENER EN OBSERVACIÓN.
-                """
+        prompt_fx = f"""
+        Actúa como un Economista Senior especializado en Mercado Forex y Macroeconomía Global.
+        Evalúa el par {base_curr}/{target_curr} y genera respuesta ÚNICAMENTE en JSON sintético:
 
-                with st.spinner("🤖 Generando dictamen cambial estratégico..."):
-                    raw_response_fx = generar_respuesta_ia_rapida(client, prompt_fx)
-                    data_json_fx = parse_json_respuesta(raw_response_fx)
+        INFORMACIÓN A EVALUAR:
+        {paquete_analisis_fx}
 
-                    if not data_json_fx:
-                        data_json_fx = generar_fallback_json_forex(base_curr, target_curr, rate_actual, horizonte_fx, proposito_fx, volatilidad_anual)
+        JSON OBLIGATORIO:
+        {{
+          "diagnostico": "Análisis macroeconómico síntesis, diferencial de tasas e indicadores técnicos (SMA 50/200) a 5 años.",
+          "viabilidad": "Evaluación de conveniencia de conversión / cobertura para {monto_fx:,.2f} {base_curr} en el horizonte {horizonte_fx}.",
+          "riesgos": "1. Política Monetaria / Tasas\\n2. Inflación y Commodities\\n3. Geopolítica / FX",
+          "veredicto": "FORTALECIMIENTO DE BASE",
+          "fundamento": "Explicación directa, sintética y ejecutiva."
+        }}
+        REGLAS: Sin cursivas ni asteriscos. 'veredicto' sólo FORTALECIMIENTO DE BASE, DEBILITAMIENTO DE BASE o MANTENER EN OBSERVACIÓN.
+        """
 
-                    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        with st.spinner("🤖 Generando dictamen cambial estratégico..."):
+          raw_response_fx = generar_respuesta_ia_rapida(client, prompt_fx)
+          data_json_fx = parse_json_respuesta(raw_response_fx)
 
-                    with col_f1:
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">1. Diagnóstico Macroeconómico y Técnico</div>
-                            <div class="analysis-card-body">{limpiar_texto_markdown(data_json_fx.get("diagnostico", ""))}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          if not data_json_fx:
+            data_json_fx = generar_fallback_json_forex(
+                base_curr,
+                target_curr,
+                rate_actual,
+                horizonte_fx,
+                proposito_fx,
+                volatilidad_anual,
+            )
 
-                    with col_f2:
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">2. Viabilidad y Sensibilidad Cambiaria</div>
-                            <div class="analysis-card-body">{limpiar_texto_markdown(data_json_fx.get("viabilidad", ""))}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          col_f1, col_f2, col_f3, col_f4 = st.columns(4)
 
-                    with col_f3:
-                        riesgos_fx_txt = limpiar_texto_markdown(data_json_fx.get("riesgos", "")).replace('\n', '<br>')
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">3. Factores de Riesgo Geopolítico / FX</div>
-                            <div class="analysis-card-body">{riesgos_fx_txt}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          with col_f1:
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">1. Diagnóstico Macroeconómico y Técnico</div>
+                    <div class="analysis-card-body">{limpiar_texto_markdown(data_json_fx.get("diagnostico", ""))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    with col_f4:
-                        st.markdown(f"""
-                        <div class="analysis-card">
-                            <div class="analysis-card-title">4. Estrategia y Posicionamiento</div>
-                            <div class="analysis-card-body">{limpiar_texto_markdown(data_json_fx.get("fundamento", ""))}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          with col_f2:
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">2. Viabilidad y Sensibilidad Cambiaria</div>
+                    <div class="analysis-card-body">{limpiar_texto_markdown(data_json_fx.get("viabilidad", ""))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+          with col_f3:
+            riesgos_fx_txt = limpiar_texto_markdown(
+                data_json_fx.get("riesgos", "")
+            ).replace("\n", "<br>")
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">3. Factores de Riesgo Geopolítico / FX</div>
+                    <div class="analysis-card-body">{riesgos_fx_txt}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    bot_fx1, bot_fx2 = st.columns([3, 1])
+          with col_f4:
+            st.markdown(
+                f"""
+                <div class="analysis-card">
+                    <div class="analysis-card-title">4. Estrategia y Posicionamiento</div>
+                    <div class="analysis-card-body">{limpiar_texto_markdown(data_json_fx.get("fundamento", ""))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    with bot_fx1:
-                        st.markdown(f"""
-                        <div class="decision-container">
-                            <div class="analysis-card-title" style="font-size: 1.12rem; margin-bottom: 10px;">🎯 Decisión y Fundamento Ejecutivo FX</div>
-                            <div class="analysis-card-body" style="font-size: 0.96rem; line-height: 1.65; color: #f8fafc;">
-                                {limpiar_texto_markdown(data_json_fx.get("fundamento", ""))}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          st.markdown(
+              "<div style='margin-top: 20px;'></div>", unsafe_allow_html=True
+          )
 
-                    with bot_fx2:
-                        veredicto_fx_clean = str(data_json_fx.get("veredicto", "MANTENER EN OBSERVACIÓN")).upper()
-                        if "FORTALECIMIENTO" in veredicto_fx_clean or "COMPRA" in veredicto_fx_clean:
-                            badge_fx_class = "decision-comprar"
-                            badge_fx_icon = "🟢"
-                            badge_fx_text = f"FORTALECIMIENTO ({base_curr})"
-                        elif "DEBILITAMIENTO" in veredicto_fx_clean or "VENTA" in veredicto_fx_clean:
-                            badge_fx_class = "decision-desestimar"
-                            badge_fx_icon = "🔴"
-                            badge_fx_text = f"DEBILITAMIENTO ({base_curr})"
-                        else:
-                            badge_fx_class = "decision-observacion"
-                            badge_fx_icon = "🟡"
-                            badge_fx_text = "ESTABLE / OBSERVACIÓN"
+          bot_fx1, bot_fx2 = st.columns([3, 1])
 
-                        st.markdown(f"""
-                        <div class="decision-badge-box {badge_fx_class}">
-                            <div style="font-size: 2.2rem; margin-bottom: 6px;">{badge_fx_icon}</div>
-                            <div style="font-weight: 800; letter-spacing: 0.08em; font-size: 1rem;">{badge_fx_text}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+          with bot_fx1:
+            st.markdown(
+                f"""
+                <div class="decision-container">
+                    <div class="analysis-card-title" style="font-size: 1.12rem; margin-bottom: 10px;">🎯 Decisión y Fundamento Ejecutivo FX</div>
+                    <div class="analysis-card-body" style="font-size: 0.96rem; line-height: 1.65; color: #f8fafc;">
+                        {limpiar_texto_markdown(data_json_fx.get("fundamento", ""))}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+          with bot_fx2:
+            veredicto_fx_clean = str(
+                data_json_fx.get("veredicto", "MANTENER EN OBSERVACIÓN")
+            ).upper()
+            if (
+                "FORTALECIMIENTO" in veredicto_fx_clean
+                or "COMPRA" in veredicto_fx_clean
+            ):
+              badge_fx_class = "decision-comprar"
+              badge_fx_icon = "🟢"
+              badge_fx_text = f"FORTALECIMIENTO ({base_curr})"
+            elif (
+                "DEBILITAMIENTO" in veredicto_fx_clean
+                or "VENTA" in veredicto_fx_clean
+            ):
+              badge_fx_class = "decision-desestimar"
+              badge_fx_icon = "🔴"
+              badge_fx_text = f"DEBILITAMIENTO ({base_curr})"
+            else:
+              badge_fx_class = "decision-observacion"
+              badge_fx_icon = "🟡"
+              badge_fx_text = "ESTABLE / OBSERVACIÓN"
+
+            st.markdown(
+                f"""
+                <div class="decision-badge-box {badge_fx_class}">
+                    <div style="font-size: 2.2rem; margin-bottom: 6px;">{badge_fx_icon}</div>
+                    <div style="font-weight: 800; letter-spacing: 0.08em; font-size: 1rem;">{badge_fx_text}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
