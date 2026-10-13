@@ -640,7 +640,7 @@ with tab_acciones:
                         else:
                             badge_cls, badge_ico, badge_txt = "decision-observacion", "🟡", "EN OBSERVACIÓN"
                         st.markdown(f"<div class='decision-badge-box {badge_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_txt}</div></div>", unsafe_allow_html=True)
-                        # ==============================================================================
+# ==============================================================================
 # PESTAÑA 2: COMPARATIVA DE DIVISAS (FOREX) EXTENDIDO
 # ==============================================================================
 with tab_forex:
@@ -678,7 +678,6 @@ with tab_forex:
                     volatilidad_fx = df_fx["Retorno_Diario"].std() * np.sqrt(252)
                     variacion_5y = ((rate_actual - df_fx["Close"].iloc[0]) / df_fx["Close"].iloc[0]) * 100
 
-                    # Obtención de tasas de interés de referencia para comparación macroeconómica
                     tasa_base_ref = TASAS_REFERENCIA_PAIS.get(base_curr, 4.50)
                     tasa_target_ref = TASAS_REFERENCIA_PAIS.get(target_curr, 4.50)
                     diferencial_tasas = tasa_base_ref - tasa_target_ref
@@ -770,22 +769,18 @@ with tab_forex:
                 Actúa como el Economista Jefe de Divisas (FX) de un Banco de Inversión Global.
                 Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional de la paridad cambiaria {base_curr}/{target_curr}. 
                 Cruza los datos estadísticos con la paridad descubierta de tasas de interés (Tasa {base_curr}: {tasa_base_ref}% vs Tasa {target_curr}: {tasa_target_ref}%, diferencial: {diferencial_tasas:+.2f}%), inflación cruzada y balanza de pagos.
-                PROHIBIDO dar respuestas vagas, superficiales o que dejen preguntas abiertas. Cada tarjeta debe ser categórica, evaluando directamente los costos de transacción y spreads estimados (0.15%), y aportando contexto geopolítico actual (como la fortaleza del Dólar Index DXY y precios de commodities).
-
-                DATOS TÉCNICOS A EVALUAR:
-                Paridad Spot Actual: {rate_actual:,.4f} | Volatilidad Anualizada: {volatilidad_fx:.2%}
-                Horizonte Temporal: {horizonte_fx} | Propósito Operativo: {proposito_fx} | Monto Evaluado: {monto_fx} {base_curr}
-                {CONTEXTO_GLOBAL_INSTITUCIONAL}
+                PROHIBIDO dar respuestas vagas o repetitivas. 
 
                 INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en formato JSON válido y limpio. Cero comillas triples Markdown, cero texto adicional fuera del JSON.
 
                 ESTRUCTURA JSON REQUERIDA:
                 {{
                   "diagnostico": "Análisis macroeconómico cambiario avanzado basado en el diferencial de tasas de interés ({diferencial_tasas:+.2f}%) y flujos de capital institucionales entre {base_curr} y {target_curr}.",
-                  "viabilidad": "Evaluación cuantitativa directa de ejecutar '{proposito_fx}' para el monto de {monto_fx} {base_curr}, integrando el impacto de los spreads operativos y el momento óptimo de entrada.",
+                  "viabilidad": "Evaluación cuantitativa directa de ejecutar '{proposito_fx}' para el monto de {monto_fx} {base_curr}, integrando el impacto de los spreads operativos (0.15%) y el timing de entrada.",
                   "riesgos": "Detalla 3 riesgos críticos cambiarios específicos en formato de lista numérica: 1. Postura de la FED y el Dólar Index. 2. Shocks en términos de intercambio locales. 3. Volatilidad de flujos de capital extranjero.",
+                  "posicionamiento": "Posicionamiento estratégico técnico detallado y específico sobre los instrumentos derivados o coberturas recomendadas.",
                   "veredicto": "FORTALECIMIENTO, DEBILITAMIENTO o NEUTRAL",
-                  "fundamento": "Dictamen estricto y directivo sin rodeos. Qué acción operativa inmediata y clara debe ejecutar el inversor o tesorero corporativo respecto a esta divisa."
+                  "resumen_ejecutivo": "Resumen ejecutivo global y claro que recopila los puntos anteriores y explica de forma comprensible el porqué exacto de la decisión para facilitar la toma de decisiones del usuario."
                 }}
                 """
                 with st.spinner("🤖 Analizando diferencial de tasas de interés, paridad cambiaria y proyecciones FX globales..."):
@@ -797,8 +792,9 @@ with tab_forex:
                             "diagnostico": f"La paridad {base_curr}/{target_curr} opera en {rate_actual:,.4f} con una volatilidad anualizada del {volatilidad_fx:.2%}. El diferencial de tasas de referencia ({diferencial_tasas:+.2f}%) condiciona directamente la dirección de los flujos cambiarios de corto plazo.",
                             "viabilidad": f"Para el propósito de {proposito_fx} con un monto de {monto_fx} {base_curr}, la aplicación evalúa un spread operativo estimado de 0.15%, determinando que el timing actual es óptimo para posiciones tácticas.",
                             "riesgos": "1. Cambios en la orientación de la política monetaria de la FED y su repercusión en el DXY.\n2. Variaciones en la balanza comercial y precios de materias primas regionales.\n3. Presiones de liquidez estacional en el mercado interbancario de divisas.",
+                            "posicionamiento": "Se recomienda el uso de contratos a término (forwards) o coberturas parciales (options collar) para blindar el flujo de caja operativo ante la volatilidad esperada.",
                             "veredicto": "FORTALECIMIENTO" if diferencial_tasas > 0 else "DEBILITAMIENTO",
-                            "fundamento": f"Dictamen FX institucional definitivo: Con un diferencial de tasas del {diferencial_tasas:+.2f}% y una volatilidad del {volatilidad_fx:.2%}, se recomienda ejecutar contratos a término (forwards) o coberturas parciales para blindar el flujo de caja operativo."
+                            "resumen_ejecutivo": f"Resumen Ejecutivo Institucional: Tras evaluar un diferencial de tasas del {diferencial_tasas:+.2f}%, una volatilidad del {volatilidad_fx:.2%} y los riesgos asociados al DXY, se determina una perspectiva de {'fortalecimiento' if diferencial_tasas > 0 else 'debilitamiento'}. La decisión busca proteger el capital y mitigar la exposición cambiaria mediante instrumentos de cobertura adecuados."
                         }
 
                     col_fx_c1, col_fx_c2, col_fx_c3, col_fx_c4 = st.columns(4)
@@ -809,13 +805,13 @@ with tab_forex:
                     with col_fx_c3:
                         st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>3. Riesgo Geopolítico / FED</div><div class='analysis-card-body'>{json_fx.get('riesgos', '').replace(chr(10), '<br>')}</div></div>", unsafe_allow_html=True)
                     with col_fx_c4:
-                        st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>4. Posicionamiento Estratégico</div><div class='analysis-card-body'>{json_fx.get('fundamento', '')}</div></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>4. Posicionamiento Estratégico</div><div class='analysis-card-body'>{json_fx.get('posicionamiento', '')}</div></div>", unsafe_allow_html=True)
 
                     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
 
                     bot_fx_a, bot_fx_b = st.columns([3, 1])
                     with bot_fx_a:
-                        st.markdown(f"<div class='decision-container'><div class='analysis-card-title' style='font-size: 1.2rem; border-bottom: none;'>🎯 Estrategia Direccional FX</div><div class='analysis-card-body' style='font-size: 1rem; color: #f8fafc;'>{json_fx.get('fundamento', '')}</div></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='decision-container'><div class='analysis-card-title' style='font-size: 1.2rem; border-bottom: none;'>🎯 Estrategia Direccional FX</div><div class='analysis-card-body' style='font-size: 1rem; color: #f8fafc;'>{json_fx.get('resumen_ejecutivo', '')}</div></div>", unsafe_allow_html=True)
                     with bot_fx_b:
                         veredicto_fx_clean = str(json_fx.get("veredicto", "NEUTRAL")).upper()
                         if "FORTALECIMIENTO" in veredicto_fx_clean or "COMPRA" in veredicto_fx_clean:
