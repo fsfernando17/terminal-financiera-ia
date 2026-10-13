@@ -183,6 +183,24 @@ st.markdown(
         margin-top: 25px;
         line-height: 1.6;
     }
+    
+    .source-note {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 6px;
+        font-style: italic;
+    }
+    
+    .fx-conv-box {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px dashed #38bdf8;
+        border-radius: 10px;
+        padding: 12px 18px;
+        margin-bottom: 20px;
+        color: #38bdf8;
+        font-size: 0.95rem;
+        font-weight: 600;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -411,7 +429,6 @@ with tab_acciones:
         else:
             datos_cargados_exitosamente = False
             try:
-                # Descarga limpia e independiente para evitar duplicación de tickers
                 objeto_stock = yf.Ticker(ticker_final)
                 df_stock = objeto_stock.history(period="5y")
                 
@@ -447,18 +464,42 @@ with tab_acciones:
                     volatilidad_anualizada = df_stock["Retorno_Diario"].std() * np.sqrt(252)
                     var_diario_95 = np.percentile(df_stock["Retorno_Diario"].dropna(), 5)
 
+                    # Apartado informativo del Tipo de Cambio si la moneda de operación difiere de la moneda del activo
+                    if moneda_base_ticker.upper() != moneda_sel[:3].upper():
+                        st.markdown(f"""
+                        <div class="fx-conv-box">
+                            🔀 <strong>Nota de Conversión Cambiaria:</strong> El activo cotiza originalmente en <strong>{moneda_base_ticker.upper()}</strong>, pero estás operando en <strong>{moneda_sel}</strong>. Se aplicó un factor de conversión institucional de <strong>{factor_conversion_ticker:.4f}</strong> (Tasa de referencia cruzada con el tipo de cambio spot).
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
                     c_m1, c_m2, c_m3, c_m4 = st.columns(4)
-                    c_m1.metric(f"Precio Actual ({simbolo_moneda})", f"{simbolo_moneda} {precio_actual:,.2f}")
-                    c_m2.metric("PER (Price / Earnings)", f"{pe_ratio}")
-                    c_m3.metric("Volatilidad Anualizada", f"{volatilidad_anualizada:.2%}")
-                    c_m4.metric("Margen Beneficio Neto", f"{margin_str}")
+                    with c_m1:
+                        st.metric(f"Precio Actual ({simbolo_moneda})", f"{simbolo_moneda} {precio_actual:,.2f}")
+                        st.markdown("<div class='source-note'>Nota: Yahoo Finance / BCRP (Tasa Spot)</div>", unsafe_allow_html=True)
+                    with c_m2:
+                        st.metric("PER (Price / Earnings)", f"{pe_ratio}")
+                        st.markdown("<div class='source-note'>Nota: Yahoo Finance Fundamentals</div>", unsafe_allow_html=True)
+                    with c_m3:
+                        st.metric("Volatilidad Anualizada", f"{volatilidad_anualizada:.2%}")
+                        st.markdown("<div class='source-note'>Nota: Modelo Econométrico GBM (5A)</div>", unsafe_allow_html=True)
+                    with c_m4:
+                        st.metric("Margen Beneficio Neto", f"{margin_str}")
+                        st.markdown("<div class='source-note'>Nota: Estados Financieros YF</div>", unsafe_allow_html=True)
 
                     c_m5, c_m6, c_m7, c_m8 = st.columns(4)
-                    c_m5.metric(f"Cap. de Mercado ({simbolo_moneda})", f"{simbolo_moneda} {market_cap:,.0f}" if market_cap > 0 else "No reportado")
-                    c_m6.metric("Ratio P/B", f"{pb_ratio}")
-                    c_m7.metric("Rendimiento Dividendo", f"{dividend_str}")
-                    c_m8.metric("VaR 95% Diarios", f"{var_diario_95:.2%}")
+                    with c_m5:
+                        st.metric(f"Cap. de Mercado ({simbolo_moneda})", f"{simbolo_moneda} {market_cap:,.0f}" if market_cap > 0 else "No reportado")
+                        st.markdown("<div class='source-note'>Nota: Yahoo Finance Market Cap</div>", unsafe_allow_html=True)
+                    with c_m6:
+                        st.metric("Ratio P/B", f"{pb_ratio}")
+                        st.markdown("<div class='source-note'>Nota: Balance General Consolidado</div>", unsafe_allow_html=True)
+                    with c_m7:
+                        st.metric("Rendimiento Dividendo", f"{dividend_str}")
+                        st.markdown("<div class='source-note'>Nota: Historial de Dividendos YF</div>", unsafe_allow_html=True)
+                    with c_m8:
+                        st.metric("VaR 95% Diarios", f"{var_diario_95:.2%}")
+                        st.markdown("<div class='source-note'>Nota: Simulación VaR Histórico</div>", unsafe_allow_html=True)
 
                     st.markdown("---")
 
@@ -629,16 +670,32 @@ with tab_forex:
 
                     st.markdown(f"### 📊 Panel de Indicadores Clave & Tasas de Referencia - {base_curr}/{target_curr}")
                     c_x1, c_x2, c_x3, c_x4 = st.columns(4)
-                    c_x1.metric("Tipo de Cambio Spot", f"{rate_actual:,.4f}")
-                    c_x2.metric(f"Tasa Ref. {base_curr} (FED/Central)", f"{tasa_base_ref:.2f}%")
-                    c_x3.metric(f"Tasa Ref. {target_curr} (Central)", f"{tasa_target_ref:.2f}%")
-                    c_x4.metric("Diferencial de Tasas", f"{diferencial_tasas:+.2f}%")
+                    with c_x1:
+                        st.metric("Tipo de Cambio Spot", f"{rate_actual:,.4f}")
+                        st.markdown("<div class='source-note'>Nota: Yahoo Finance FX Interbank</div>", unsafe_allow_html=True)
+                    with c_x2:
+                        st.metric(f"Tasa Ref. {base_curr} (FED/Central)", f"{tasa_base_ref:.2f}%")
+                        st.markdown("<div class='source-note'>Nota: Banco Central Base</div>", unsafe_allow_html=True)
+                    with c_x3:
+                        st.metric(f"Tasa Ref. {target_curr} (Central)", f"{tasa_target_ref:.2f}%")
+                        st.markdown("<div class='source-note'>Nota: Banco Central Destino</div>", unsafe_allow_html=True)
+                    with c_x4:
+                        st.metric("Diferencial de Tasas", f"{diferencial_tasas:+.2f}%")
+                        st.markdown("<div class='source-note'>Nota: Paridad de Tasas de Interés</div>", unsafe_allow_html=True)
 
                     c_x5, c_x6, c_x7, c_x8 = st.columns(4)
-                    c_x5.metric("Monto Convertido", f"{monto_fx * rate_actual:,.2f} {target_curr}")
-                    c_x6.metric("Volatilidad Anualizada", f"{volatilidad_fx:.2%}")
-                    c_x7.metric("Variación Histórica 5A", f"{variacion_5y:+.2f}%")
-                    c_x8.metric("Spread Cambiario Est. (% min)", "0.15%")
+                    with c_x5:
+                        st.metric("Monto Convertido", f"{monto_fx * rate_actual:,.2f} {target_curr}")
+                        st.markdown("<div class='source-note'>Nota: Cálculo Spot Actualizado</div>", unsafe_allow_html=True)
+                    with c_x6:
+                        st.metric("Volatilidad Anualizada", f"{volatilidad_fx:.2%}")
+                        st.markdown("<div class='source-note'>Nota: Desviación Estándar 5A FX</div>", unsafe_allow_html=True)
+                    with c_x7:
+                        st.metric("Variación Histórica 5A", f"{variacion_5y:+.2f}%")
+                        st.markdown("<div class='source-note'>Nota: Retorno Histórico Quinquenal</div>", unsafe_allow_html=True)
+                    with c_x8:
+                        st.metric("Spread Cambiario Est. (% min)", "0.15%")
+                        st.markdown("<div class='source-note'>Nota: Costo Promedio Interbancario</div>", unsafe_allow_html=True)
 
                     st.markdown("---")
 
