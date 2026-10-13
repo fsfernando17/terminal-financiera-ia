@@ -23,14 +23,14 @@ st.markdown("""
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* CORRECCIÓN DE CONTRASTE: Forzar color blanco/brillante en todas las etiquetas de entrada */
+    /* CORRECCIÓN DE CONTRASTE: Color blanco brillante en todas las etiquetas de entrada */
     label, [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stWidgetLabel p {
         color: #f3f4f6 !important;
         font-weight: 600 !important;
         font-size: 0.95rem !important;
     }
     
-    /* Estilo de cajas de selección e inputs */
+    /* Cajas de selección e inputs */
     div[data-baseweb="select"] > div, input {
         background-color: #1f2937 !important;
         color: #ffffff !important;
@@ -99,7 +99,7 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
     }
 
-    /* Cajas de Aviso Legal */
+    /* Caja de Aviso Legal */
     .disclaimer-box {
         background-color: #17120a;
         border-left: 4px solid #f59e0b;
@@ -117,13 +117,16 @@ api_key_oculta = st.secrets.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
 
-# CONEXIÓN DIRECTA A MODELOS ACTIVOS DE GOOGLE AI STUDIO
+# CONEXIÓN EXCLUSIVA A LOS MODELOS OFICIALES ACTIVOS EN TU GOOGLE AI STUDIO
 def generar_respuesta_ia_rapida(client, prompt):
     """
-    Utiliza estrictamente los modelos habilitados en la consola de Google AI Studio:
-    gemini-3.8-flash -> gemini-3.7-flash -> gemini-3.6-flash
+    Ruta de ejecución restringida ÚNICAMENTE a los modelos activos en tu cuenta:
+    - gemini-3.8-flash
+    - gemini-3.7-flash
+    - gemini-3.6-flash
     """
     modelos_validos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
+    ultimo_error = None
     
     for modelo in modelos_validos:
         try:
@@ -133,10 +136,11 @@ def generar_respuesta_ia_rapida(client, prompt):
             )
             if response and response.text:
                 return response.text
-        except Exception:
+        except Exception as e:
+            ultimo_error = e
             continue
             
-    raise Exception("No se pudo obtener respuesta de la API de Gemini. Verifique la clave GEMINI_API_KEY en los secretos.")
+    raise Exception(f"Error de conexión con la API de Gemini: {str(ultimo_error)}")
 
 
 # --- DICCIONARIOS MULTIMONEDA Y MERCADOS ---
@@ -172,7 +176,7 @@ MERCADOS = {
 st.title("📈 Asistente Inteligente de Inversiones Bursátiles")
 st.markdown("<p style='color: #9ca3af; font-size: 1.05rem; margin-bottom: 25px;'>Terminal cuantitativa, fundamental y econométrica para la evaluación estratégica de activos financieros globales.</p>", unsafe_allow_html=True)
 
-# --- PANEL DE CONFIGURACIÓN LIMPIO (SIN BARRAS HUÉRFANAS) ---
+# --- PANEL DE CONFIGURACIÓN LIMPIO ---
 with st.container(border=True):
     st.subheader("⚙️ Parámetros Operativos de Inversión")
 
@@ -227,7 +231,7 @@ st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 # --- BOTÓN PRINCIPAL DE EJECUCIÓN ---
 if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_container_width=True):
     if not api_key_oculta or not client:
-        st.error("⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta la clave GEMINI_API_KEY en Secrets).")
+        st.error("⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta la clave GEMINI_API_KEY en Secrets de Streamlit).")
     else:
         with st.spinner(f"Procesando métricas cuantitativas, econométricas y de riesgo para {ticker_final}..."):
             try:
@@ -386,7 +390,7 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                     - **Fundamento:** Breve justificación ejecutiva.
                     """
 
-                    # Generación inmediata
+                    # Generación inmediata usando únicamente los modelos válidos activos
                     informe_ia = generar_respuesta_ia_rapida(client, prompt_ia)
 
                     # --- TARJETA VISUAL PARA EL DICTAMEN FINAL ---
