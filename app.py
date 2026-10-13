@@ -195,13 +195,11 @@ api_key_oculta = st.secrets.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
 def limpiar_texto_markdown(texto_entrada):
-    """Limpia caracteres innecesarios de formato en las respuestas de la IA."""
     if not texto_entrada:
         return ""
     return str(texto_entrada).replace("`", "").strip()
 
 def parse_json_respuesta(texto_crudo):
-    """Parsea de forma segura respuestas JSON devueltas por modelos generativos."""
     if not texto_crudo:
         return None
     texto_limpio = texto_crudo.strip()
@@ -220,7 +218,6 @@ def parse_json_respuesta(texto_crudo):
     return None
 
 def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
-    """Ejecuta llamadas seguras con fallback entre modelos de Gemini."""
     modelos_disponibles = ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
     configuracion_tokens = types.GenerateContentConfig(temperature=0.2, max_output_tokens=4000)
     for modelo in modelos_disponibles:
@@ -238,14 +235,12 @@ def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
 # MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (MOVIMIENTO BROWNIANO GEOMÉTRICO)
 # ==============================================================================
 def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500):
-    """Simula trayectorias estocásticas acopladas al horizonte temporal."""
     dias_historia = 30 if dias_proy <= 60 else (90 if dias_proy <= 180 else 252)
     retornos_recientes = retornos_diarios.tail(dias_historia) if len(retornos_diarios) > dias_historia else retornos_diarios
     
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
     
-    # Calibración estricta para evitar dispersiones exageradas
     sigma_calibrado = sigma_diario * (0.60 if dias_proy <= 60 else (0.75 if dias_proy <= 180 else 0.95))
     
     drift = mu_diario - 0.5 * (sigma_calibrado ** 2)
@@ -298,7 +293,6 @@ CONTEXTO_GLOBAL_INSTITUCIONAL = """
 """
 
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
-    """Calcula el factor de conversión cruzada entre monedas."""
     tasa_destino = TASAS_CAMBIO_USD[moneda_destino_key]
     base_upper = str(moneda_base_asset).upper()
     if "PEN" in base_upper or "SOL" in base_upper:
@@ -314,7 +308,6 @@ def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
     return (1.0 / tasa_base_usd) * tasa_destino
 
 def obtener_historial_forex(base_curr, target_curr):
-    """Obtiene el historial cambiario cruzado desde Yahoo Finance con fallbacks robustos."""
     try:
         if base_curr == target_curr:
             fechas_dummy = pd.date_range(end=pd.Timestamp.now(), periods=1260, freq="B")
@@ -618,8 +611,8 @@ with tab_forex:
 
                     fig_fx = go.Figure()
                     fig_fx.add_trace(go.Scatter(x=fechas_hist_fx, y=df_fx["Close"], mode="lines", name="Tipo de Cambio Histórico", line=dict(color="#10b981", width=2.0)))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p90_fx, mode="lines", name="Escenario Volatilidad (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", dash="dash")))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p90_fx, mode="lines", name="Escenario Volatilidad (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
                     fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=mediana_fx, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
 
                     fig_fx.update_layout(
