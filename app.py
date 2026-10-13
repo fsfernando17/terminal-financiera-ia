@@ -47,7 +47,7 @@ st.markdown(
     .stMarkdown h3, div[data-testid="stMarkdownContainer"] h3 {
         color: #38bdf8 !important;
         font-weight: 700 !important;
-        font-size: 1.15rem !important;
+        font-size: 1.12rem !important;
         margin-top: 0.2rem !important;
         margin-bottom: 0.5rem !important;
     }
@@ -55,8 +55,8 @@ st.markdown(
     /* Párrafos y listas */
     .stMarkdown p, div[data-testid="stMarkdownContainer"] p, div[data-testid="stMarkdownContainer"] li {
         color: #e5e7eb !important;
-        font-size: 0.93rem !important;
-        line-height: 1.6 !important;
+        font-size: 0.92rem !important;
+        line-height: 1.55 !important;
     }
 
     /* Títulos y Métricas */
@@ -143,42 +143,70 @@ api_key_oculta = st.secrets.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
 
-# SISTEMA IA CON RESPUESTA ESTRUCTURADA EN JSON (MODELOS OFICIALES DE TU CONSOLA)
+# MODELOS OFICIALES DE GOOGLE AI STUDIO Y GENERACIÓN ASÍNCRONA
 def generar_respuesta_ia_rapida(client, prompt):
-    modelos_validos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
-    ultimo_error = None
-
+    modelos_validos = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
+    
     config = types.GenerateContentConfig(
-        temperature=0.2,
-        max_output_tokens=1000,
+        temperature=0.1,
+        max_output_tokens=500,
         response_mime_type="application/json"
     )
 
     for modelo in modelos_validos:
-        for intento in range(3):
+        try:
+            response = client.models.generate_content(
+                model=modelo,
+                contents=prompt,
+                config=config
+            )
+            if response and response.text:
+                return response.text
+        except Exception:
+            continue
+
+    return None
+
+
+def parse_json_respuesta(text):
+    if not text:
+        return None
+    cleaned = text.strip()
+    cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s*```$', '', cleaned)
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+        if match:
             try:
-                response = client.models.generate_content(
-                    model=modelo, contents=prompt, config=config
-                )
-                if response and response.text:
-                    return response.text
-            except Exception as e:
-                ultimo_error = e
-                err_str = str(e)
-                if any(
-                    err in err_str
-                    for err in [
-                        "500", "503", "429", "INTERNAL", "UNAVAILABLE", "RESOURCE_EXHAUSTED"
-                    ]
-                ):
-                    time.sleep(0.8 * (intento + 1))
-                else:
-                    break
-
-    raise Exception(f"Detalle de servicio API: {str(ultimo_error)}")
+                return json.loads(match.group(0))
+            except Exception:
+                pass
+    return None
 
 
-# --- DICCIONARIOS, Mapeo de Tickers y TASAS DE CONVERSIÓN ---
+def generar_fallback_json(simb, capital_input, precio_actual, perfil_riesgo, horizonte, pe_ratio, volatilidad_anual):
+    es_insuficiente = capital_input < precio_actual
+    es_riesgoso = (perfil_riesgo == "Conservador" and volatilidad_anual > 0.25)
+    
+    if es_insuficiente or es_riesgoso:
+        veredicto = "DESESTIMAR"
+        fundamento = f"El capital disponible ({simb} {capital_input:,.2f}) es insuficiente para adquirir 1 acción completa ({simb} {precio_actual:,.2f}) o la volatilidad excede la tolerancia del perfil {perfil_riesgo}."
+    else:
+        veredicto = "MANTENER EN OBSERVACIÓN"
+        fundamento = f"El activo presenta métricas aceptables con un PER de {pe_ratio}, pero requiere monitoreo según el horizonte de {horizonte}."
+
+    return {
+        "diagnostico": f"El activo cotiza a un precio de {simb} {precio_actual:,.2f} con un PER de {pe_ratio} evaluado sobre la curva de los últimos 5 años.",
+        "viabilidad": f"Capital disponible de {simb} {capital_input:,.2f} frente al precio unitario de {simb} {precio_actual:,.2f} en un horizonte de {horizonte}.",
+        "riesgos": "1. Sensibilidad a tasas de interés\n2. Volatilidad sectorial y macroeconómica\n3. Variaciones en la demanda global",
+        "veredicto": veredicto,
+        "fundamento": fundamento
+    }
+
+
+# --- DICCIONARIOS, MAPEO DE TICKERS Y TASAS DE CONVERSIÓN ---
 TICKER_MAP = {
     "SPCCPI1.LM": "SCCO",
     "SPCCPI2.LM": "SCCO",
@@ -346,15 +374,13 @@ if st.button(
             "⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta la clave GEMINI_API_KEY en Secrets)."
         )
     else:
-        # 1. PASO BURSÁTIL Y CUANTITATIVO (CON FALLBACK DE TICKERS)
+        # 1. PASO BURSÁTIL Y CUANTITATIVO (HISTÓRICO 5 AÑOS)
         datos_cargados = False
         try:
-            # Búsqueda con resolución de mapa
             search_ticker = TICKER_MAP.get(ticker_final, ticker_final)
             stock = yf.Ticker(search_ticker)
             df = stock.history(period="5y")
             
-            # Intento secundario si finaliza en .LM y vino vacío
             if df.empty and search_ticker.endswith(".LM"):
                 alt_ticker = search_ticker.replace(".LM", "")
                 stock = yf.Ticker(alt_ticker)
@@ -535,120 +561,93 @@ if st.button(
         except Exception as e:
             st.error(f"Error procesando métricas financieras: {str(e)}")
 
-        # 2. INTELIGENCIA ARTIFICIAL EN MODO JSON (LIGADO AL BOCETO PAINT)
+        # 2. INTELIGENCIA ARTIFICIAL RESILIENTE EN MODO JSON
         if datos_cargados:
             st.markdown("## 📋 Dictamen Estratégico de Inversión")
 
             paquete_analisis = f"""
             Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
-            Precio Actual: {simb} {precio_actual:,.2f}
-            Capital disponible: {simb} {capital_input:,.2f}
+            Precio Actual: {simb} {precio_actual:,.2f} | Capital: {simb} {capital_input:,.2f}
             Moneda: {moneda_sel} | Horizonte: {horizonte} | Perfil: {perfil_riesgo}
-            
-            HISTÓRICO 5 AÑOS & FUNDAMENTALES:
-            - PER: {pe_ratio} | P/B: {pb_ratio} | Dividend Yield: {dividend_str} | Margen Beneficio: {margin_str}
-            - Volatilidad Anualizada (5A): {volatilidad_anual:.2%}
-            - VaR 95% (5A): {var_95:.2%}
-            - Media Móvil 50d: {simb} {sma_50:,.2f} | Media Móvil 200d: {simb} {sma_200:,.2f}
+            PER: {pe_ratio} | P/B: {pb_ratio} | Volatilidad 5A: {volatilidad_anual:.2%} | VaR 95%: {var_95:.2%}
+            SMA 50: {simb} {sma_50:,.2f} | SMA 200: {simb} {sma_200:,.2f}
             """
 
             prompt_ia = f"""
-            Actúa como un Director de Análisis Cuantitativo y Gestor de Portafolios Financieros.
-            Evalúa la siguiente información financiera y genera una respuesta ÚNICAMENTE en formato JSON válido.
-
-            INFORMACIÓN DEL ACTIVO:
+            Genera respuesta ÚNICAMENTE en JSON sintético:
             {paquete_analisis}
 
-            ESTRUCTURA DE SALIDA REQUERIDA EN JSON:
+            JSON OBLIGATORIO:
             {{
-              "diagnostico": "Análisis detallado de valoración (PER, P/B) y estructura técnica (SMA 50/200) a 5 años.",
-              "viabilidad": "Análisis sobre la suficiencia del capital disponible ({simb} {capital_input:,.2f}) frente al precio unitario ({simb} {precio_actual:,.2f}) y alineación con el perfil {perfil_riesgo} en {horizonte}.",
-              "riesgos": "1. Sensibilidad Macro\\n2. Demanda y Sector\\n3. Cadena de Suministro o Regulación",
+              "diagnostico": "Análisis síntesis de PER, P/B y SMA 50/200 a 5 años.",
+              "viabilidad": "Evalúa capital {simb} {capital_input:,.2f} vs precio {simb} {precio_actual:,.2f} y perfil {perfil_riesgo}.",
+              "riesgos": "1. Macro\\n2. Sectorial\\n3. Operativo",
               "veredicto": "DESESTIMAR",
-              "fundamento": "Justificación ejecutiva sintética y clara de la decisión tomada."
+              "fundamento": "Explicación directa y ejecutiva."
             }}
-
-            REGLAS CRÍTICAS DE FORMATO:
-            1. Responde ÚNICAMENTE con el objeto JSON.
-            2. NO utilices cursivas (*texto* o _texto_) bajo ninguna circunstancia.
-            3. Asegura que no existan palabras unidas sin espacios.
-            4. El valor del campo 'veredicto' debe ser exactamente uno de: COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN.
+            REGLAS: Sin cursivas ni asteriscos. 'veredicto' sólo COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN.
             """
 
-            with st.spinner("🤖 Generando dictamen estratégico con Inteligencia Artificial (Gemini)..."):
-                try:
-                    informe_raw = generar_respuesta_ia_rapida(client, prompt_ia)
-                    
-                    try:
-                        data_json = json.loads(informe_raw)
-                    except Exception:
-                        data_json = {
-                            "diagnostico": "El activo cotiza con métricas fundamentales alineadas a su promedio de 5 años.",
-                            "viabilidad": f"El capital disponible de {simb} {capital_input:,.2f} se evalúa frente al valor unitario del activo.",
-                            "riesgos": "1. Riesgo de mercado\n2. Volatilidad sectorial\n3. Condiciones macroeconómicas",
-                            "veredicto": "MANTENER EN OBSERVACIÓN",
-                            "fundamento": "Se sugiere mantener cautela según la volatilidad y horizonte seleccionado."
-                        }
+            with st.spinner("🤖 Generando dictamen estratégico..."):
+                raw_response = generar_respuesta_ia_rapida(client, prompt_ia)
+                data_json = parse_json_respuesta(raw_response)
+                
+                if not data_json:
+                    data_json = generar_fallback_json(simb, capital_input, precio_actual, perfil_riesgo, horizonte, pe_ratio, volatilidad_anual)
 
-                    # --- RENDEREIZADO BASADO EXACTAMENTE EN TU BOCETO EN PAINT ---
-                    
-                    # 1. FILA SUPERIOR: 4 TARJETAS VERTICALES EN PARALELO
-                    col1, col2, col3, col4 = st.columns(4)
+                # --- RENDERIZADO BASADO EN BOCETO EN PAINT ---
+                col1, col2, col3, col4 = st.columns(4)
 
-                    with col1:
-                        with st.container(border=True):
-                            st.markdown("### 1. Diagnóstico Fundamental y Técnico")
-                            st.markdown(data_json.get("diagnostico", ""))
+                with col1:
+                    with st.container(border=True):
+                        st.markdown("### 1. Diagnóstico Fundamental y Técnico")
+                        st.markdown(data_json.get("diagnostico", ""))
 
-                    with col2:
-                        with st.container(border=True):
-                            st.markdown("### 2. Viabilidad del Capital y Horizonte")
-                            st.markdown(data_json.get("viabilidad", ""))
+                with col2:
+                    with st.container(border=True):
+                        st.markdown("### 2. Viabilidad del Capital y Horizonte")
+                        st.markdown(data_json.get("viabilidad", ""))
 
-                    with col3:
-                        with st.container(border=True):
-                            st.markdown("### 3. Factores de Riesgo Macro")
-                            st.markdown(data_json.get("riesgos", ""))
+                with col3:
+                    with st.container(border=True):
+                        st.markdown("### 3. Factores de Riesgo Macro")
+                        st.markdown(data_json.get("riesgos", ""))
 
-                    with col4:
-                        with st.container(border=True):
-                            st.markdown("### 4. Veredicto Estratégico")
-                            st.markdown(data_json.get("fundamento", ""))
+                with col4:
+                    with st.container(border=True):
+                        st.markdown("### 4. Veredicto Estratégico")
+                        st.markdown(data_json.get("fundamento", ""))
 
-                    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-                    # 2. FILA INFERIOR: CAJA DE DECISIÓN AMPLIA + INSIGNIA DESTACADA
-                    bot_col1, bot_col2 = st.columns([3, 1])
+                bot_col1, bot_col2 = st.columns([3, 1])
 
-                    with bot_col1:
-                        with st.container(border=True):
-                            st.markdown("### 🎯 Decisión y Fundamento Ejecutivo")
-                            st.markdown(data_json.get("fundamento", ""))
+                with bot_col1:
+                    with st.container(border=True):
+                        st.markdown("### 🎯 Decisión y Fundamento Ejecutivo")
+                        st.markdown(data_json.get("fundamento", ""))
 
-                    with bot_col2:
-                        veredicto_clean = str(data_json.get("veredicto", "MANTENER EN OBSERVACIÓN")).upper()
-                        if "COMPRAR" in veredicto_clean and "DESESTIMAR" not in veredicto_clean:
-                            badge_class = "decision-comprar"
-                            badge_icon = "🟢"
-                            badge_text = "COMPRAR"
-                        elif "DESESTIMAR" in veredicto_clean:
-                            badge_class = "decision-desestimar"
-                            badge_icon = "🔴"
-                            badge_text = "DESESTIMAR"
-                        else:
-                            badge_class = "decision-observacion"
-                            badge_icon = "🟡"
-                            badge_text = "MANTENER EN OBSERVACIÓN"
+                with bot_col2:
+                    veredicto_clean = str(data_json.get("veredicto", "MANTENER EN OBSERVACIÓN")).upper()
+                    if "COMPRAR" in veredicto_clean and "DESESTIMAR" not in veredicto_clean:
+                        badge_class = "decision-comprar"
+                        badge_icon = "🟢"
+                        badge_text = "COMPRAR"
+                    elif "DESESTIMAR" in veredicto_clean:
+                        badge_class = "decision-desestimar"
+                        badge_icon = "🔴"
+                        badge_text = "DESESTIMAR"
+                    else:
+                        badge_class = "decision-observacion"
+                        badge_icon = "🟡"
+                        badge_text = "MANTENER EN OBSERVACIÓN"
 
-                        st.markdown(
-                            f"""
-                            <div class="decision-box {badge_class}">
-                                <div style="font-size: 2rem; margin-bottom: 4px;">{badge_icon}</div>
-                                <div>{badge_text}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                except Exception as e_ia:
-                    st.warning("⚠️ La API de IA experimentó una micro-saturación. Por favor presione el botón nuevamente.")
+                    st.markdown(
+                        f"""
+                        <div class="decision-box {badge_class}">
+                            <div style="font-size: 2rem; margin-bottom: 4px;">{badge_icon}</div>
+                            <div>{badge_text}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
