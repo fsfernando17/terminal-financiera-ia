@@ -302,9 +302,9 @@ MERCADOS = {
 
 CONTEXTO_GLOBAL_INSTITUCIONAL = """
 [CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL VIGENTE]: 
-1. Bancos Centrales (FED, BCE, BCRP): Las tasas de referencia determinan el costo de oportunidad del capital (WACC) y la liquidez global.
-2. Renta Variable y Asignación de Capital: Inversores con capital limitado frente al precio unitario deben considerar alternativas como acciones fraccionadas, fondos indexados (ETFs) o diversificación sectorial.
-3. Geopolítica y Commodities: La volatilidad global condiciona la prima de riesgo.
+1. Bancos Centrales (FED, BCE, BCRP): Tasas de referencia, postura monetaria y expectativas inflacionarias determinan el costo de capital y los flujos cruzados.
+2. Análisis Cuantitativo y Predictivo: Se integran modelos estocásticos (GBM Monte Carlo), análisis técnico (tendencias, soporte/resistencia) y fundamental (múltiplos PER, P/B, flujos de caja).
+3. Gestión de Portafolio: Asignación táctica basada estrictamente en capital disponible, perfil de riesgo y horizonte temporal.
 """
 
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
@@ -530,20 +530,20 @@ with tab_acciones:
                 """
 
                 prompt_ia_stock = f"""
-                Actúa como el Director de Análisis Cuantitativo y Valoración de Activos de un Fondo de Inversión Global (Hedge Fund).
-                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (WACC, múltiplos PER {pe_ratio}, P/B {pb_ratio}, flujos de caja libre) y la macroeconomía actual.
+                Actúa como el Director de Análisis Cuantitativo y Gestor de Portafolios de un Fondo de Inversión Global (Hedge Fund).
+                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (WACC, múltiplos PER {pe_ratio}, P/B {pb_ratio}), análisis técnico, econométrico y estocástico (Monte Carlo).
                 PROHIBIDO dar respuestas vagas o repetitivas. 
 
                 INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en un objeto JSON válido y limpio. Cero comillas triples Markdown, cero texto adicional fuera del JSON.
                 
                 ESTRUCTURA JSON REQUERIDA:
                 {{
-                  "diagnostico": "Análisis fundamental profundo. Evalúa el PER ({pe_ratio}), el P/B ({pb_ratio}) y la valoración del activo frente a su sector y la política monetaria global actual.",
+                  "diagnostico": "Análisis fundamental y técnico profundo. Evalúa el PER ({pe_ratio}), el P/B ({pb_ratio}), las tendencias de precios y la valoración del activo frente a su sector y la política monetaria global actual.",
                   "viabilidad": "1. Análisis de Capital: Compara matemáticamente el capital de {simbolo_moneda} {capital_input:,.2f} frente al precio unitario de {simbolo_moneda} {precio_actual:,.2f}. 2. Análisis de Perfil: Contrasta la volatilidad del {volatilidad_anualizada:.2%} con el perfil de riesgo {perfil_riesgo}.",
-                  "riesgos": "Detalla 3 riesgos críticos y específicos del activo en formato de lista numérica: 1. Riesgo de tasas y costo de capital. 2. Riesgos sistémicos del sector. 3. Volatilidad macroeconómica.",
-                  "conclusion_tecnica": "Conclusión técnica específica centrada en la valoración econométrica y la relación riesgo-retorno del activo.",
+                  "riesgos": "Detalla 3 riesgos críticos y específicos del activo en formato de lista numérica: 1. Riesgo de tasas y costo de capital. 2. Riesgos sistémicos del sector. 3. Volatilidad macroeconómica y posible crisis.",
+                  "conclusion_tecnica": "Conclusión técnica específica centrada en la valoración econométrica, el VaR 95% ({var_diario_95:.2%}) y la relación riesgo-retorno del activo.",
                   "veredicto": "COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN",
-                  "dictamen_institucional": "Resumen ejecutivo integral y recomendación financiera específica adaptada al capital de {simbolo_moneda} {capital_input:,.2f} y perfil {perfil_riesgo}. Recomienda instrumentos financieros concretos (ej. acciones fraccionadas, ETFs diversificados o renta fija) y explica claramente el porqué de la decisión."
+                  "dictamen_institucional": "Dictamen gerencial ultra preciso y detallado. Cruzando estrictamente tu capital de {simbolo_moneda} {capital_input:,.2f}, tu perfil {perfil_riesgo} y tu horizonte de tiempo ({horizonte}), especifica con nombres claros en qué vehículo financiero invertir exactamente: si el capital no cubre la acción entera, recomienda plataformas de 'acciones fraccionadas', 'fondos mutuos indexados globales' (ej. ETFs como SPY o VOO), 'depósitos a plazo fijo bancarios' o 'renta fija soberana'. Explica detalladamente el porqué, el momento de entrada y cómo mitigar los riesgos."
                 }}
                 """
 
@@ -700,21 +700,21 @@ with tab_forex:
                 st.markdown(f"## 📋 Dictamen Estratégico FX Institucional ({base_curr}/{target_curr})")
 
                 prompt_ia_fx = f"""
-                Actúa como el Economista Jefe de Divisas (FX) de un Banco de Inversión Global.
+                Actúa como el Economista Jefe de Divisas (FX) y Tesorero Global de un Banco de Inversión.
                 Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional de la paridad cambiaria {base_curr}/{target_curr}. 
-                Cruza los datos estadísticos con la paridad descubierta de tasas de interés (Tasa {base_curr}: {tasa_base_ref}% vs Tasa {target_curr}: {tasa_target_ref}%, diferencial: {diferencial_tasas:+.2f}%), inflación cruzada y balanza de pagos.
+                Cruza los datos estadísticos con la paridad descubierta de tasas de interés (Tasa {base_curr}: {tasa_base_ref}% vs Tasa {target_curr}: {tasa_target_ref}%, diferencial: {diferencial_tasas:+.2f}%), inflación cruzada, balanza de pagos, políticas de bancos centrales, noticias y escenarios de posibles crisis geopolíticas o cambiarias.
                 PROHIBIDO dar respuestas vagas o repetitivas. 
 
                 INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en formato JSON válido y limpio. Cero comillas triples Markdown, cero texto adicional fuera del JSON.
 
                 ESTRUCTURA JSON REQUERIDA:
                 {{
-                  "diagnostico": "Análisis macroeconómico cambiario avanzado basado en el diferencial de tasas de interés ({diferencial_tasas:+.2f}%) y flujos de capital institucionales entre {base_curr} y {target_curr}.",
-                  "viabilidad": "Evaluación cuantitativa directa de ejecutar '{proposito_fx}' para el monto de {monto_fx} {base_curr}, integrando el impacto de los spreads operativos (0.15%) y el timing de entrada.",
-                  "riesgos": "Detalla 3 riesgos críticos cambiarios específicos en formato de lista numérica: 1. Postura de la FED y el Dólar Index. 2. Shocks en términos de intercambio locales. 3. Volatilidad de flujos de capital extranjero.",
-                  "posicionamiento": "Posicionamiento estratégico técnico detallado y específico sobre los instrumentos derivados o coberturas recomendadas.",
+                  "diagnostico": "Análisis macroeconómico cambiario avanzado basado en el diferencial de tasas de interés ({diferencial_tasas:+.2f}%), políticas monetarias (FED/BCRP), balanza comercial y flujos de capital institucionales entre {base_curr} y {target_curr}.",
+                  "viabilidad": "Evaluación cuantitativa directa de ejecutar '{proposito_fx}' para el monto de {monto_fx} {base_curr}, integrando el impacto de los spreads operativos (0.15%), costos de transacción y el timing exacto de entrada.",
+                  "riesgos": "Detalla 3 riesgos críticos cambiarios específicos en formato de lista numérica: 1. Postura de la FED y el Dólar Index (DXY). 2. Shocks en términos de intercambio locales y commodities. 3. Riesgos geopolíticos, fiscales o especulativos de futuras crisis.",
+                  "posicionamiento": "Posicionamiento estratégico técnico detallado y específico sobre los instrumentos derivados o coberturas recomendadas (ej. Contratos Forward, opciones Collar).",
                   "veredicto": "FORTALECIMIENTO, DEBILITAMIENTO o NEUTRAL",
-                  "resumen_ejecutivo": "Resumen ejecutivo global y claro que recopila los puntos anteriores y explica de forma comprensible el porqué exacto de la decisión para facilitar la toma de decisiones del usuario."
+                  "resumen_ejecutivo": "Estrategia Direccional FX Directa y Precisa: Evalúa con contundencia si el precio de {base_curr} frente a {target_curr} aumentará o disminuirá. Recomienda con claridad si se debe COMPRAR o VENDER la divisa, en qué momento exacto ejecutar la orden, y en qué otras monedas de refugio altamente estables (ej. USD, EUR, CHF) conviene respaldar el capital de {monto_fx} {base_curr} frente a posibles crisis futuras, justificándolo con los análisis econométricos y técnicos realizados."
                 }}
                 """
                 with st.spinner("🤖 Analizando diferencial de tasas de interés, paridad cambiaria y proyecciones FX globales..."):
@@ -727,8 +727,7 @@ with tab_forex:
                             "viabilidad": f"Para el propósito de {proposito_fx} con un monto de {monto_fx} {base_curr}, la aplicación evalúa un spread operativo estimado de 0.15%, determinando que el timing actual es óptimo para posiciones tácticas.",
                             "riesgos": "1. Cambios en la orientación de la política monetaria de la FED y su repercusión en el DXY.\n2. Variaciones en la balanza comercial y precios de materias primas regionales.\n3. Presiones de liquidez estacional en el mercado interbancario de divisas.",
                             "posicionamiento": "Se recomienda el uso de contratos a término (forwards) o coberturas parciales (options collar) para blindar el flujo de caja operativo ante la volatilidad esperada.",
-                            "veredicto": "FORTALECIMIENTO" if diferencial_tasas > 0 else "DEBILITAMIENTO",
-                            "resumen_ejecutivo": f"Resumen Ejecutivo Institucional: Tras evaluar un diferencial de tasas del {diferencial_tasas:+.2f}%, una volatilidad del {volatilidad_fx:.2%} y los riesgos asociados al DXY, se determina una perspectiva de {'fortalecimiento' if diferencial_tasas > 0 else 'debilitamiento'}. La decisión busca proteger el capital y mitigar la exposición cambiaria mediante instrumentos de cobertura adecuados."
+                            "resumen_ejecutivo": f"Estrategia Direccional FX: Basado en el diferencial de tasas del {diferencial_tasas:+.2f}% y la volatilidad del {volatilidad_fx:.2%}, se proyecta una tendencia de {'fortalecimiento' if diferencial_tasas > 0 else 'debilitamiento'}. Se recomienda **comprar** la divisa objetivo de forma escalonada (dolarización/conversión táctica) para proteger el capital ante episodios de volatilidad global, respaldando parte de los fondos en monedas estables como el Dólar (USD) o el Franco Suizo (CHF)."
                         }
 
                     col_fx_c1, col_fx_c2, col_fx_c3, col_fx_c4 = st.columns(4)
