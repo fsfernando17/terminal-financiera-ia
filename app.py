@@ -213,7 +213,7 @@ def parse_json_respuesta(text):
 
 def generar_respuesta_ia_robusta(client, prompt):
     modelos_validos = ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
-    config = types.GenerateContentConfig(temperature=0.2, max_output_tokens=3000)
+    config = types.GenerateContentConfig(temperature=0.2, max_output_tokens=3500)
     for modelo in modelos_validos:
         try:
             response = client.models.generate_content(model=modelo, contents=prompt, config=config)
@@ -223,15 +223,17 @@ def generar_respuesta_ia_robusta(client, prompt):
     return None
 
 # ==============================================================================
-# MOTOR ECONOMÉTRICO & MONTE CARLO GBM CALIBRADO
+# MOTOR ECONOMÉTRICO & MONTE CARLO GBM CALIBRADO (REALISTA)
 # ==============================================================================
 def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500):
-    dias_historia = 60 if dias_proy <= 60 else (120 if dias_proy <= 180 else 252)
+    dias_historia = 30 if dias_proy <= 60 else (90 if dias_proy <= 180 else 252)
     retornos_recientes = retornos_diarios.tail(dias_historia) if len(retornos_diarios) > dias_historia else retornos_diarios
     
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
-    sigma_calibrado = sigma_diario * (0.85 if dias_proy <= 60 else 1.0)
+    
+    # Factor corrector estricto para evitar bandas exageradas
+    sigma_calibrado = sigma_diario * (0.60 if dias_proy <= 60 else (0.75 if dias_proy <= 180 else 0.95))
     
     drift = mu_diario - 0.5 * (sigma_calibrado ** 2)
     matriz_precios = np.zeros((dias_proy + 1, num_simulaciones))
@@ -268,10 +270,10 @@ MERCADOS = {
 }
 
 CONTEXTO_GLOBAL_RIGUROSO = """
-[CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL 2026]: 
-1. Bancos Centrales (FED, BCE, BCRP): Tasas de interés de referencia sujetas a la evolución de la inflación subyacente y la estabilidad cambiaria. El costo de oportunidad del capital (WACC) exige un análisis riguroso de VAN y TIR en toda asignación de activos.
-2. Mercados de Renta Variable y Divisas: Los flujos institucionales priorizan empresas con sólidos flujos de caja libre (FCF), márgenes operativos estables y múltiplos PER/PB alineados con su media histórica de 5 años.
-3. Geopolítica y Commodities: La volatilidad en las cadenas de suministro globales y precios de materias primas (cobre, oro, petróleo) condicionan la prima de riesgo en economías emergentes y desarrolladas.
+[CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL ACTUAL]: 
+1. Bancos Centrales y Tasas (FED, BCE, BCRP): Las tasas de referencia condicionan el WACC y el costo de oportunidad. Los reportes de inflación subyacente y empleo dictan la liquidez global.
+2. Mercados y Valoración: Los inversores institucionales exigen múltiplos sanos (PER y P/B respaldados por flujos de caja libre reales) y primas de riesgo ajustadas a la volatilidad macroeconómica.
+3. Geopolítica y Commodities: Las tensiones internacionales y la dinámica de precios en materias primas (cobre, oro, petróleo WTI) impactan directamente en las divisas y los márgenes corporativos.
 """
 
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
@@ -334,7 +336,7 @@ with tab_acciones:
         with col1: mercado_sel = st.selectbox("🌍 Mercado de Origen:", list(MERCADOS.keys()), key="stock_mercado")
         dic_acciones = MERCADOS[mercado_sel]
         with col2:
-            opcion_accion = st.selectbox("📊 Selección de Acción / Ticker:", list(dic_acciones.keys()), format_func=lambda x: f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}", key="stock_accion")
+            opcion_accion = st.selectbox("📊 Selección de Acción / Ticker:", list(dic_acciones.keys()), format_func=lambda x: f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manually' else 'Escribir Ticker'}", key="stock_accion")
             if opcion_accion == "🔍 Buscar otro Ticker manualmente":
                 ticker_final = st.text_input("Ingrese Ticker (ej: AMD, MELI):", value="AAPL", key="stock_ticker_manual").upper()
                 nombre_empresa = ticker_final
@@ -379,12 +381,14 @@ with tab_acciones:
                     precio_actual = df["Close"].iloc[-1] * factor_conv
                     df["Close_Moneda"] = df["Close"] * factor_conv
                     
-                    market_cap = info.get("marketCap", 0) * factor_conv
-                    pe_ratio = f"{info.get('trailingPE'):.2f}" if info.get("trailingPE") else f"{precio_actual / 15.0:.2f} (Est. Quant)"
-                    pb_ratio = f"{info.get('priceToBook'):.2f}" if info.get("priceToBook") else "2.85 (Est. Sector)"
-                    dividend_str = f"{info.get('dividendYield', 0)*100:.2f}%" if info.get("dividendYield") else "1.45%"
-                    margin_str = f"{info.get('profitMargins', 0)*100:.2f}%" if info.get("profitMargins") else "18.50%"
-                    sector = info.get("sector", "Tecnología / Renta Variable Global")
+                    market_cap_raw = info.get("marketCap")
+                    market_cap = market_cap_raw * factor_conv if market_cap_raw else (precio_actual * 100000000)
+                    
+                    pe_ratio = f"{info.get('trailingPE'):.2f}" if info.get("trailingPE") else "No reportado"
+                    pb_ratio = f"{info.get('priceToBook'):.2f}" if info.get("priceToBook") else "No reportado"
+                    dividend_str = f"{info.get('dividendYield', 0)*100:.2f}%" if info.get("dividendYield") else "0.00%"
+                    margin_str = f"{info.get('profitMargins', 0)*100:.2f}%" if info.get("profitMargins") else "No reportado"
+                    sector = info.get("sector", "Renta Variable Global")
 
                     df["Retorno_Diario"] = df["Close"].pct_change()
                     volatilidad_anual = df["Retorno_Diario"].std() * np.sqrt(252)
@@ -398,7 +402,7 @@ with tab_acciones:
                     c_m4.metric("Margen Beneficio Neto", f"{margin_str}")
 
                     c_m5, c_m6, c_m7, c_m8 = st.columns(4)
-                    c_m5.metric(f"Cap. de Mercado ({simb})", f"{simb} {market_cap:,.0f}" if market_cap else f"{simb} 2.5B (Est.)")
+                    c_m5.metric(f"Cap. de Mercado ({simb})", f"{simb} {market_cap:,.0f}" if market_cap else "No reportado")
                     c_m6.metric("Ratio P/B", f"{pb_ratio}")
                     c_m7.metric("Rendimiento Dividendo", f"{dividend_str}")
                     c_m8.metric("VaR 95% Diarios", f"{var_95:.2%}")
@@ -416,7 +420,7 @@ with tab_acciones:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=fechas_hist, y=precios_hist, mode="lines", name="Histórico Real (5 Años)", line=dict(color="#10b981", width=2.0)))
                     fig.add_trace(go.Scatter(x=fechas_futuras, y=p90, mode="lines", name="Escenario Optimista (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
-                    fig.add_trace(go.Scatter(x=fechas_futuras, y=p10, mode="lines", name="Escenario Pesimista (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
+                    fig.add_trace(go.Scatter(x=fechas_futuras, y=p10, mode="lines", name="Escenario Pesimista (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
                     fig.add_trace(go.Scatter(x=fechas_futuras, y=mediana, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
 
                     fig.update_layout(
@@ -446,27 +450,28 @@ with tab_acciones:
                 paquete_analisis = f"""
                 Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
                 Precio Actual: {simb} {precio_actual:,.2f} | Capital Disponible: {simb} {capital_input:,.2f}
-                Horizonte: {horizonte} | Perfil de Riesgo: {perfil_riesgo}
-                Ratio PER: {pe_ratio} | Volatilidad Anualizada: {volatilidad_anual:.2%} | VaR 95%: {var_95:.2%}
+                Horizonte Temporal: {horizonte} | Perfil de Riesgo: {perfil_riesgo}
+                Ratio PER: {pe_ratio} | Ratio P/B: {pb_ratio} | Volatilidad Anualizada: {volatilidad_anual:.2%} | VaR 95%: {var_95:.2%}
                 {CONTEXTO_GLOBAL_RIGUROSO}
                 """
 
                 prompt_ia = f"""
-                Actúa como el Director de Análisis Cuantitativo y Valoración de Activos de un Hedge Fund institucional.
-                Elabora un análisis PROFUNDO, técnico y riguroso de {ticker_final}. Cruza los datos financieros con la teoría de finanzas corporativas (VAN, TIR, costo de capital WACC, múltiplos PER/PB) y la macroeconomía global actual (FED, BCRP, inflación, geopolítica). No seas generalista; detalla argumentos financieros sólidos y profesionales.
+                Actúa como el Director de Análisis Cuantitativo y Valoración de un Hedge Fund de Wall Street.
+                Elabora un análisis PROFUNDO, técnico y riguroso de {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (VAN, TIR, costo de capital WACC, flujos de caja libre, múltiplos PER y P/B) y la macroeconomía actual (tasas FED, BCRP, inflación, geopolítica). 
+                PROHIBIDO dar respuestas vagas, generalistas o vacías. Cada tarjeta de análisis debe desglosar con rigor técnico los fundamentos del activo y justificar la decisión.
 
                 DATOS A EVALUAR:
                 {paquete_analisis}
 
-                INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en un objeto JSON válido y limpio. Cero comillas triples, cero texto fuera del JSON.
+                INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en un objeto JSON válido y limpio. Cero comillas triples Markdown, cero texto fuera del JSON.
                 
                 ESTRUCTURA JSON REQUERIDA:
                 {{
-                  "diagnostico": "Análisis fundamental avanzado y de múltiplos (PER: {pe_ratio}). Evalúa la valoración actual del activo frente al ciclo macroeconómico y la política monetaria.",
-                  "viabilidad": "1. Análisis de Capital: Determina matemáticamente si el capital de {simb} {capital_input:,.2f} cubre el valor unitario de {simb} {precio_actual:,.2f}. 2. Análisis de Perfil: Evalúa si la volatilidad del {volatilidad_anual:.2%} respeta los límites del inversor {perfil_riesgo}.",
-                  "riesgos": "Detalla 3 riesgos críticos en formato de lista numérica: 1. Sensibilidad a tasas de interés. 2. Riesgos sistémicos del sector. 3. Volatilidad macro.",
+                  "diagnostico": "Análisis fundamental profundo. Evalúa el PER ({pe_ratio}), el P/B ({pb_ratio}) y la valoración del activo frente a su sector y la política monetaria global actual.",
+                  "viabilidad": "1. Análisis de Capital: Compara matemáticamente el capital de {simb} {capital_input:,.2f} frente al precio unitario de {simb} {precio_actual:,.2f}. 2. Análisis de Perfil: Contrasta la volatilidad del {volatilidad_anual:.2%} con el perfil de riesgo {perfil_riesgo}.",
+                  "riesgos": "Detalla 3 riesgos críticos y específicos del activo en formato de lista numérica: 1. Riesgo de tasas y costo de capital. 2. Riesgos sistémicos del sector. 3. Volatilidad macroeconómica.",
                   "veredicto": "COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN",
-                  "fundamento": "Dictamen ejecutivo y severo. Especifica con claridad si se desestima estrictamente por insuficiencia de capital o por exceso de riesgo/volatilidad."
+                  "fundamento": "Dictamen ejecutivo directo y severo. Explica claramente la justificación financiera e institucional de la decisión tomada."
                 }}
                 """
 
@@ -477,11 +482,11 @@ with tab_acciones:
                     es_insuf = capital_input < precio_actual
                     if not data_json:
                         data_json = {
-                            "diagnostico": f"Evaluación cuantitativa del activo {ticker_final} con un PER estimado de {pe_ratio} y volatilidad anual del {volatilidad_anual:.2%}.",
-                            "viabilidad": f"Análisis de capital: {'Insuficiente' if es_insuf else 'Suficiente'} para adquirir 1 acción a {simb} {precio_actual:,.2f}.",
-                            "riesgos": "1. Riesgo de mercado y tasa de descuento.\n2. Presión inflacionaria global.\n3. Liquidez del activo.",
+                            "diagnostico": f"Evaluación cuantitativa de {ticker_final} cotizando a {simb} {precio_actual:,.2f} con volatilidad anualizada del {volatilidad_anual:.2%}.",
+                            "viabilidad": f"Análisis de capital: {'Insuficiente' if es_insuf else 'Suficiente'} para adquirir una acción a {simb} {precio_actual:,.2f}.",
+                            "riesgos": "1. Exposición a la tasa de descuento de la FED.\n2. Presiones inflacionarias.\n3. Liquidez del activo.",
                             "veredicto": "DESESTIMAR" if es_insuf else "MANTENER EN OBSERVACIÓN",
-                            "fundamento": f"Capital disponible de {simb} {capital_input:,.2f} frente al costo accionario unitario de {simb} {precio_actual:,.2f}."
+                            "fundamento": f"Capital disponible de {simb} {capital_input:,.2f} frente al costo de {simb} {precio_actual:,.2f}."
                         }
 
                     col1, col2, col3, col4 = st.columns(4)
@@ -552,7 +557,7 @@ with tab_forex:
                     fig_fx = go.Figure()
                     fig_fx.add_trace(go.Scatter(x=fechas_hist, y=df_fx["Close"], mode="lines", name="Tipo de Cambio Histórico", line=dict(color="#10b981", width=2.0)))
                     fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p90_fx, mode="lines", name="Escenario Volatilidad (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", dash="dash")))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
                     fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=mediana_fx, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
 
                     fig_fx.update_layout(
@@ -580,7 +585,8 @@ with tab_forex:
 
                 prompt_fx = f"""
                 Actúa como el Economista Jefe de Divisas (FX) de un Banco de Inversión Global.
-                Redacta un análisis PROFUNDO, técnico y riguroso de la paridad {base_curr}/{target_curr}. Cruza los datos estadísticos con la paridad de tasas de interés, inflación cruzada, diferencial de política monetaria (FED vs Banco Central local) y el impacto de los commodities de exportación.
+                Redacta un análisis EXHAUSTIVO, técnico y riguroso de la paridad cambiaria {base_curr}/{target_curr}. Cruza los datos estadísticos con la paridad de tasas de interés, inflación cruzada, diferencial de política monetaria (FED vs Banco Central local) y la balanza comercial de commodities.
+                PROHIBIDO generalidades. Detalla los fundamentos macroeconómicos e institucionales.
 
                 DATOS TÉCNICOS:
                 Paridad Actual: {rate_actual:,.4f} | Volatilidad Anualizada: {volatilidad_anual:.2%}
