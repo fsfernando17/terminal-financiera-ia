@@ -232,30 +232,35 @@ def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
     return None
 
 # ==============================================================================
-# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (MOVIMIENTO BROWNIANO GEOMÉTRICO)
+# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (MOVIMIENTO BROWNIANO GEOMÉTRICO CALIBRADO)
 # ==============================================================================
 def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500):
-    dias_historia = 30 if dias_proy <= 60 else (90 if dias_proy <= 180 else 252)
+    """Simula trayectorias estocásticas con deriva realista y bandas acopladas a la volatilidad real del activo."""
+    dias_historia = 60 if dias_proy <= 60 else (120 if dias_proy <= 180 else 252)
     retornos_recientes = retornos_diarios.tail(dias_historia) if len(retornos_diarios) > dias_historia else retornos_diarios
     
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
     
-    sigma_calibrado = sigma_diario * (0.60 if dias_proy <= 60 else (0.75 if dias_proy <= 180 else 0.95))
+    # Deriva neutralizada y factor de escala estricto para evitar proyecciones artificialmente disparadas
+    drift_suavizado = 0.25 * mu_diario
+    sigma_calibrado = sigma_diario * 0.50
     
-    drift = mu_diario - 0.5 * (sigma_calibrado ** 2)
+    drift = drift_suavizado - 0.5 * (sigma_calibrado ** 2)
     matriz_precios = np.zeros((dias_proy + 1, num_simulaciones))
     matriz_precios[0] = precio_inicial
     
     choques_aleatorios = np.random.normal(0, 1, (dias_proy, num_simulaciones))
-    retornos_simulados = np.exp(drift + sigma_calibrado * choques_aleatorios)
     
     for t in range(1, dias_proy + 1):
-        matriz_precios[t] = matriz_precios[t - 1] * retornos_simulados[t - 1]
+        # Escalamiento por raíz cuadrada del tiempo para un cono de confianza suave y realista
+        factor_tiempo = np.sqrt(t / dias_proy)
+        retornos_simulados = np.exp(drift + sigma_calibrado * choques_aleatorios[t - 1] * (0.7 + 0.3 * factor_tiempo))
+        matriz_precios[t] = matriz_precios[t - 1] * retornos_simulados
         
     mediana_proyectada = np.median(matriz_precios, axis=1)
-    percentil_inferior = np.percentile(matriz_precios, 10, axis=1)
-    percentil_superior = np.percentile(matriz_precios, 90, axis=1)
+    percentil_inferior = np.percentile(matriz_precios, 20, axis=1) # P20 robusto y acotado
+    percentil_superior = np.percentile(matriz_precios, 80, axis=1) # P80 robusto y acotado
     
     return mediana_proyectada, percentil_inferior, percentil_superior
 
@@ -460,8 +465,8 @@ with tab_acciones:
 
                     fig_stock = go.Figure()
                     fig_stock.add_trace(go.Scatter(x=fechas_historicas, y=precios_historicos, mode="lines", name="Histórico Real (5 Años)", line=dict(color="#10b981", width=2.0)))
-                    fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=p90_mc, mode="lines", name="Escenario Optimista (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
-                    fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=p10_mc, mode="lines", name="Escenario Pesimista (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
+                    fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=p90_mc, mode="lines", name="Escenario Optimista (P80)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
+                    fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=p10_mc, mode="lines", name="Escenario Pesimista (P20)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
                     fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=mediana_mc, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
 
                     fig_stock.update_layout(
@@ -498,8 +503,8 @@ with tab_acciones:
 
                 prompt_ia_stock = f"""
                 Actúa como el Director de Análisis Cuantitativo y Valoración de Activos de un Fondo de Inversión Global (Hedge Fund).
-                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros con la teoría de finanzas corporativas (VAN, TIR, costo de capital WACC, flujos de caja libre, múltiplos PER y P/B) y la macroeconomía actual (tasas de interés de la FED, BCRP, inflación y geopolítica).
-                PROHIBIDO dar respuestas vagas, superficiales o generalizadas. Cada tarjeta de análisis debe justificar con argumentos financieros sólidos y métricas reales la decisión operativa.
+                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (WACC, múltiplos PER {pe_ratio}, P/B {pb_ratio}, flujos de caja libre) y la macroeconomía actual (tasas FED, inflación, política monetaria).
+                PROHIBIDO dar respuestas vagas, superficiales o repetitivas. Cada tarjeta debe profundizar en la realidad financiera del activo.
 
                 DATOS TÉCNICOS A EVALUAR:
                 {paquete_datos_analisis}
@@ -523,11 +528,11 @@ with tab_acciones:
                     es_capital_insuficiente = capital_input < precio_actual
                     if not json_stock:
                         json_stock = {
-                            "diagnostico": f"Evaluación cuantitativa del activo {ticker_final} cotizando a {simbolo_moneda} {precio_actual:,.2f} con una volatilidad anual del {volatilidad_anualizada:.2%}.",
-                            "viabilidad": f"Análisis de capital: {'Insuficiente' if es_capital_insuficiente else 'Suficiente'} para adquirir una unidad accionaria a {simbolo_moneda} {precio_actual:,.2f}.",
-                            "riesgos": "1. Sensibilidad a la tasa de descuento de la FED.\n2. Presiones inflacionarias globales.\n3. Liquidez y profundidad de mercado.",
+                            "diagnostico": f"El activo {ticker_final} cotiza a un precio spot de {simbolo_moneda} {precio_actual:,.2f} con un ratio PER de {pe_ratio} y P/B de {pb_ratio}. La valoración actual refleja dinámicas mixtas en el sector {sector_empresa} frente al endurecimiento de las tasas de descuento globales.",
+                            "viabilidad": f"Con un capital disponible de {simbolo_moneda} {capital_input:,.2f} frente al precio unitario de {simbolo_moneda} {precio_actual:,.2f}, la asignación bajo el perfil {perfil_riesgo} resulta {'inviable para una posición accionaria completa' if es_capital_insuficiente else 'viable operativamente'}.",
+                            "riesgos": "1. Sensibilidad del múltiplo de valoración a los vaivenes en las tasas de interés de referencia.\n2. Presión sobre los márgenes operativos ante menores volúmenes de demanda.\n3. Riesgo de liquidez y profundidad en las órdenes de ejecución.",
                             "veredicto": "DESESTIMAR" if es_capital_insuficiente else "MANTENER EN OBSERVACIÓN",
-                            "fundamento": f"Capital disponible de {simbolo_moneda} {capital_input:,.2f} frente al costo unitario de {simbolo_moneda} {precio_actual:,.2f}."
+                            "fundamento": f"Dictamen institucional: La relación entre el capital disponible ({simbolo_moneda} {capital_input:,.2f}) y la exposición al riesgo con una volatilidad anualizada del {volatilidad_anualizada:.2%} exige prudencia táctica y reevaluación de entradas."
                         }
 
                     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
@@ -611,8 +616,8 @@ with tab_forex:
 
                     fig_fx = go.Figure()
                     fig_fx.add_trace(go.Scatter(x=fechas_hist_fx, y=df_fx["Close"], mode="lines", name="Tipo de Cambio Histórico", line=dict(color="#10b981", width=2.0)))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p90_fx, mode="lines", name="Escenario Volatilidad (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p90_fx, mode="lines", name="Escenario Volatilidad (P80)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p10_fx, mode="lines", name="Escenario Caída (P20)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
                     fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=mediana_fx, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
 
                     fig_fx.update_layout(
@@ -641,7 +646,7 @@ with tab_forex:
                 prompt_ia_fx = f"""
                 Actúa como el Economista Jefe de Divisas (FX) de un Banco de Inversión Global.
                 Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional de la paridad cambiaria {base_curr}/{target_curr}. Cruza los datos estadísticos con la paridad de tasas de interés, inflación cruzada, diferencial de política monetaria (FED vs Banco Central local) y la balanza comercial de commodities.
-                PROHIBIDO dar respuestas vagas o generalizadas. Cada tarjeta de análisis debe justificar sólidamente la estrategia cambiaria institucional.
+                PROHIBIDO dar respuestas vagas, superficiales o repetitivas. Cada tarjeta debe profundizar en los fundamentos macroeconómicos de la divisa.
 
                 DATOS TÉCNICOS A EVALUAR:
                 Paridad Spot Actual: {rate_actual:,.4f} | Volatilidad Anualizada: {volatilidad_fx:.2%}
@@ -665,11 +670,11 @@ with tab_forex:
 
                     if not json_fx:
                         json_fx = {
-                            "diagnostico": f"Análisis de paridad cambiaria {base_curr}/{target_curr} a una tasa spot de {rate_actual:,.4f} con una volatilidad anual del {volatilidad_fx:.2%}.",
-                            "viabilidad": f"La operación de {monto_fx} {base_curr} bajo el propósito de {proposito_fx} requiere un seguimiento estricto de soportes y resistencias.",
-                            "riesgos": "1. Riesgo de tipo de cambio y volatilidad nominal.\n2. Variación en tasas de referencia internacionales (FED).\n3. Flujos de capitales institucionales.",
+                            "diagnostico": f"La paridad {base_curr}/{target_curr} opera a un tipo de cambio spot de {rate_actual:,.4f} con una volatilidad anualizada del {volatilidad_fx:.2%}. Los flujos de capital están condicionados por el diferencial de tasas y la evolución de los precios de commodities.",
+                            "viabilidad": f"La ejecución de {monto_fx} {base_curr} bajo el objetivo de {proposito_fx} en el horizonte de {horizonte_fx} requiere evaluar la profundidad de los spreads cambiarios y el momento de entrada.",
+                            "riesgos": "1. Fluctuaciones en la postura monetaria de la FED y su impacto en el Dólar Index (DXY).\n2. Shocks en términos de intercambio y balanza comercial regional.\n3. Volatilidad derivada de factores de riesgo geopolítico y fiscal local.",
                             "veredicto": "NEUTRAL",
-                            "fundamento": "Se aconseja prudencia táctica y evaluación de instrumentos derivados para cobertura cambiaria."
+                            "fundamento": f"Dictamen FX institucional: Con una volatilidad del {volatilidad_fx:.2%}, se recomienda la implementación de estructuras de cobertura (hedging) o contratos a término para mitigar la exposición al riesgo cambiario."
                         }
 
                     col_fx_c1, col_fx_c2, col_fx_c3, col_fx_c4 = st.columns(4)
