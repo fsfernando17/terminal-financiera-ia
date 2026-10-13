@@ -277,7 +277,6 @@ DIVISAS = {
     "GBP": "Libra Esterlina (GBP)", "JPY": "Yen Japonés (JPY)", "MXN": "Peso Mexicano (MXN)",
     "CLP": "Peso Chileno (CLP)", "COP": "Peso Colombiano (COP)", "BRL": "Real Brasileño (BRL)"
 }
-TICKER_MAP = {"SPCCPI1.LM": "SCCO", "SPCCPI2.LM": "SCCO"}
 TASAS_CAMBIO_USD = {"USD ($)": 1.0, "PEN (S/.)": 3.75, "CLP ($)": 950.0, "BRL (R$)": 5.50, "MXN ($)": 19.50}
 SIMBOLOS_MONEDA = {"USD ($)": "$", "PEN (S/.)": "S/.", "CLP ($)": "$ CLP", "BRL (R$)": "R$", "MXN ($)": "$ MXN"}
 MINIMOS_MONEDA = {"USD ($)": 20.0, "PEN (S/.)": 75.0, "CLP ($)": 19000.0, "BRL (R$)": 110.0, "MXN ($)": 390.0}
@@ -302,9 +301,8 @@ MERCADOS = {
 
 CONTEXTO_GLOBAL_INSTITUCIONAL = """
 [CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL VIGENTE]: 
-1. Bancos Centrales (FED, BCE, BCRP): Tasas de referencia, postura monetaria y expectativas inflacionarias determinan el costo de capital y los flujos cruzados.
-2. Análisis Cuantitativo y Predictivo: Se integran modelos estocásticos (GBM Monte Carlo), análisis técnico (tendencias, soporte/resistencia) y fundamental (múltiplos PER, P/B, flujos de caja).
-3. Gestión de Portafolio: Asignación táctica basada estrictamente en capital disponible, perfil de riesgo y horizonte temporal.
+1. Bancos Centrales (FED, BCE, BCRP): Tasas de referencia y política monetaria.
+2. Modelos Cuantitativos y Estocásticos: Simulación de Monte Carlo (GBM), VaR y análisis fundamental por activo.
 """
 
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
@@ -413,12 +411,12 @@ with tab_acciones:
         else:
             datos_cargados_exitosamente = False
             try:
-                search_ticker = TICKER_MAP.get(ticker_final, ticker_final)
-                objeto_stock = yf.Ticker(search_ticker)
+                # Descarga limpia e independiente para evitar duplicación de tickers
+                objeto_stock = yf.Ticker(ticker_final)
                 df_stock = objeto_stock.history(period="5y")
                 
-                if df_stock.empty and search_ticker.endswith(".LM"):
-                    objeto_stock = yf.Ticker(search_ticker.replace(".LM", ""))
+                if df_stock.empty and ticker_final == "SPCCPI1.LM":
+                    objeto_stock = yf.Ticker("SCCO")
                     df_stock = objeto_stock.history(period="5y")
                 
                 if df_stock.empty:
@@ -531,19 +529,19 @@ with tab_acciones:
 
                 prompt_ia_stock = f"""
                 Actúa como el Director de Análisis Cuantitativo y Gestor de Portafolios de un Fondo de Inversión Global (Hedge Fund).
-                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (WACC, múltiplos PER {pe_ratio}, P/B {pb_ratio}), análisis técnico, econométrico y estocástico (Monte Carlo).
-                PROHIBIDO dar respuestas vagas o repetitivas. 
+                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. 
+                PROHIBIDO dar respuestas genéricas o vagas.
 
                 INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en un objeto JSON válido y limpio. Cero comillas triples Markdown, cero texto adicional fuera del JSON.
                 
                 ESTRUCTURA JSON REQUERIDA:
                 {{
-                  "diagnostico": "Análisis fundamental y técnico profundo. Evalúa el PER ({pe_ratio}), el P/B ({pb_ratio}), las tendencias de precios y la valoración del activo frente a su sector y la política monetaria global actual.",
+                  "diagnostico": "Análisis fundamental y técnico profundo. Evalúa el PER ({pe_ratio}), el P/B ({pb_ratio}) y la valoración del activo frente a su sector y la política monetaria global actual.",
                   "viabilidad": "1. Análisis de Capital: Compara matemáticamente el capital de {simbolo_moneda} {capital_input:,.2f} frente al precio unitario de {simbolo_moneda} {precio_actual:,.2f}. 2. Análisis de Perfil: Contrasta la volatilidad del {volatilidad_anualizada:.2%} con el perfil de riesgo {perfil_riesgo}.",
                   "riesgos": "Detalla 3 riesgos críticos y específicos del activo en formato de lista numérica: 1. Riesgo de tasas y costo de capital. 2. Riesgos sistémicos del sector. 3. Volatilidad macroeconómica y posible crisis.",
                   "conclusion_tecnica": "Conclusión técnica específica centrada en la valoración econométrica, el VaR 95% ({var_diario_95:.2%}) y la relación riesgo-retorno del activo.",
                   "veredicto": "COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN",
-                  "dictamen_institucional": "Dictamen gerencial ultra preciso y detallado. Cruzando estrictamente tu capital de {simbolo_moneda} {capital_input:,.2f}, tu perfil {perfil_riesgo} y tu horizonte de tiempo ({horizonte}), especifica con nombres claros en qué vehículo financiero invertir exactamente: si el capital no cubre la acción entera, recomienda plataformas de 'acciones fraccionadas', 'fondos mutuos indexados globales' (ej. ETFs como SPY o VOO), 'depósitos a plazo fijo bancarios' o 'renta fija soberana'. Explica detalladamente el porqué, el momento de entrada y cómo mitigar los riesgos."
+                  "dictamen_institucional": "RECOMENDACIÓN FINANCIERA ULTRA PRECISA: Analiza estrictamente si el capital de {simbolo_moneda} {capital_input:,.2f} alcanza o no para comprar acciones completas de {ticker_final} a {simbolo_moneda} {precio_actual:,.2f}. Si no alcanza, indica exactamente en qué vehículo financiero invertir de acuerdo a su perfil {perfil_riesgo} y horizonte {horizonte} (ej: invertir mediante 'acciones fraccionadas' en brokers regulados, adquirir 'ETFs indexados globales' como SPY o VOO, o reasignar temporalmente a un 'depósito a plazo fijo' o 'fondos mutuos de renta fija'). Explica el porqué exacto de esta recomendación gerencial."
                 }}
                 """
 
@@ -559,7 +557,7 @@ with tab_acciones:
                             "riesgos": "1. Sensibilidad del múltiplo de valoración a los vaivenes en las tasas de interés de referencia.\n2. Presión sobre los márgenes operativos ante menores volúmenes de demanda.\n3. Riesgo de liquidez y profundidad en las órdenes de ejecución.",
                             "conclusion_tecnica": f"Dictamen técnico: La relación entre el capital disponible ({simbolo_moneda} {capital_input:,.2f}) y la exposición al riesgo con una volatilidad anualizada del {volatilidad_anualizada:.2%} exige prudencia táctica.",
                             "veredicto": "DESESTIMAR" if es_capital_insuficiente else "MANTENER EN OBSERVACIÓN",
-                            "dictamen_institucional": f"Dictamen Institucional Integral: Dado tu capital de {simbolo_moneda} {capital_input:,.2f} y perfil {perfil_riesgo}, comprar una unidad entera a {simbolo_moneda} {precio_actual:,.2f} no es óptimo. Se recomienda utilizar herramientas de corretaje con **acciones fraccionadas** o diversificar en **ETFs indexados globales** para mitigar la volatilidad del {volatilidad_anualizada:.2%}."
+                            "dictamen_institucional": f"Dictamen Institucional Integral: Tu capital de {simbolo_moneda} {capital_input:,.2f} {'es insuficiente para adquirir una acción entera a' if es_capital_insuficiente else 'cubre operativamente'} {simbolo_moneda} {precio_actual:,.2f}. Bajo tu perfil {perfil_riesgo} y horizonte {horizonte}, la recomendación precisa es utilizar plataformas de **acciones fraccionadas** o diversificar en **ETFs globales de bajo costo (como SPY)** para mitigar el riesgo de volatilidad del {volatilidad_anualizada:.2%}."
                         }
 
                     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
@@ -702,19 +700,18 @@ with tab_forex:
                 prompt_ia_fx = f"""
                 Actúa como el Economista Jefe de Divisas (FX) y Tesorero Global de un Banco de Inversión.
                 Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional de la paridad cambiaria {base_curr}/{target_curr}. 
-                Cruza los datos estadísticos con la paridad descubierta de tasas de interés (Tasa {base_curr}: {tasa_base_ref}% vs Tasa {target_curr}: {tasa_target_ref}%, diferencial: {diferencial_tasas:+.2f}%), inflación cruzada, balanza de pagos, políticas de bancos centrales, noticias y escenarios de posibles crisis geopolíticas o cambiarias.
-                PROHIBIDO dar respuestas vagas o repetitivas. 
+                PROHIBIDO dar respuestas genéricas.
 
                 INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en formato JSON válido y limpio. Cero comillas triples Markdown, cero texto adicional fuera del JSON.
 
                 ESTRUCTURA JSON REQUERIDA:
                 {{
-                  "diagnostico": "Análisis macroeconómico cambiario avanzado basado en el diferencial de tasas de interés ({diferencial_tasas:+.2f}%), políticas monetarias (FED/BCRP), balanza comercial y flujos de capital institucionales entre {base_curr} y {target_curr}.",
-                  "viabilidad": "Evaluación cuantitativa directa de ejecutar '{proposito_fx}' para el monto de {monto_fx} {base_curr}, integrando el impacto de los spreads operativos (0.15%), costos de transacción y el timing exacto de entrada.",
-                  "riesgos": "Detalla 3 riesgos críticos cambiarios específicos en formato de lista numérica: 1. Postura de la FED y el Dólar Index (DXY). 2. Shocks en términos de intercambio locales y commodities. 3. Riesgos geopolíticos, fiscales o especulativos de futuras crisis.",
-                  "posicionamiento": "Posicionamiento estratégico técnico detallado y específico sobre los instrumentos derivados o coberturas recomendadas (ej. Contratos Forward, opciones Collar).",
+                  "diagnostico": "Análisis macroeconómico cambiario avanzado basado en el diferencial de tasas de interés ({diferencial_tasas:+.2f}%), políticas monetarias (FED vs BCR), balanza comercial y flujos de capital.",
+                  "viabilidad": "Evaluación cuantitativa directa de ejecutar '{proposito_fx}' para el monto de {monto_fx} {base_curr}, integrando spreads (0.15%), costos de transacción y timing exacto de entrada.",
+                  "riesgos": "Detalla 3 riesgos críticos cambiarios específicos en formato de lista numérica: 1. Postura de la FED y DXY. 2. Shocks en términos de intercambio. 3. Riesgos geopolíticos, fiscales o especulativos de crisis.",
+                  "posicionamiento": "Posicionamiento estratégico técnico sobre instrumentos derivados (ej. Contratos Forward a 90 días, opciones Collar).",
                   "veredicto": "FORTALECIMIENTO, DEBILITAMIENTO o NEUTRAL",
-                  "resumen_ejecutivo": "Estrategia Direccional FX Directa y Precisa: Evalúa con contundencia si el precio de {base_curr} frente a {target_curr} aumentará o disminuirá. Recomienda con claridad si se debe COMPRAR o VENDER la divisa, en qué momento exacto ejecutar la orden, y en qué otras monedas de refugio altamente estables (ej. USD, EUR, CHF) conviene respaldar el capital de {monto_fx} {base_curr} frente a posibles crisis futuras, justificándolo con los análisis econométricos y técnicos realizados."
+                  "resumen_ejecutivo": "ESTRATEGIA DIRECCIONAL FX PRECISADA: Responde categóricamente si el precio de la divisa aumentará o disminuirá en el horizonte de {horizonte_fx}. Recomienda de forma explícita si se debe COMPRAR o VENDER la divisa y el momento exacto de ejecución táctica. Además, especifica detalladamente en qué otras monedas de refugio altamente estables (ej. Dólar USD, Franco Suizo CHF o Euro EUR) conviene respaldar el capital de {monto_fx} {base_curr} para blindarlo ante futuras crisis globales, sustentándolo con el diferencial de tasas del {diferencial_tasas:+.2f}% y la volatilidad del {volatilidad_fx:.2%}."
                 }}
                 """
                 with st.spinner("🤖 Analizando diferencial de tasas de interés, paridad cambiaria y proyecciones FX globales..."):
