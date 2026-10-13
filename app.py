@@ -185,21 +185,12 @@ st.markdown(
     }
     
     .source-note {
-        font-size: 0.75rem;
-        color: #64748b;
-        margin-top: 6px;
+        font-size: 0.72rem;
+        color: #94a3b8;
+        margin-top: 8px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(148, 163, 184, 0.15);
         font-style: italic;
-    }
-    
-    .fx-conv-box {
-        background: rgba(30, 41, 59, 0.6);
-        border: 1px dashed #38bdf8;
-        border-radius: 10px;
-        padding: 12px 18px;
-        margin-bottom: 20px;
-        color: #38bdf8;
-        font-size: 0.95rem;
-        font-weight: 600;
     }
     </style>
     """,
@@ -255,7 +246,7 @@ def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
     return None
 
 # ==============================================================================
-# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (GBM CALIBRADO)
+# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (GBM CALIBRADO Y REALISTA)
 # ==============================================================================
 def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500, es_forex=False):
     dias_historia = 60 if dias_proy <= 60 else (120 if dias_proy <= 180 else 252)
@@ -264,8 +255,9 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
     
-    factor_escala = 0.35 if es_forex else 0.50
-    drift_suavizado = 0.20 * mu_diario
+    # Factores estrictamente calibrados para evitar proyecciones exageradas o irreales
+    factor_escala = 0.18 if es_forex else 0.25
+    drift_suavizado = 0.05 * mu_diario
     sigma_calibrado = sigma_diario * factor_escala
     
     drift = drift_suavizado - 0.5 * (sigma_calibrado ** 2)
@@ -277,7 +269,7 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     for t in range(1, dias_proy + 1):
         factor_tiempo = np.sqrt(t / dias_proy)
         retornos_simulados = np.exp(
-            drift + sigma_calibrado * choques_aleatorios[t - 1] * (0.8 + 0.2 * factor_tiempo)
+            drift + sigma_calibrado * choques_aleatorios[t - 1] * (0.5 + 0.1 * factor_tiempo)
         )
         matriz_precios[t] = matriz_precios[t - 1] * retornos_simulados
         
@@ -288,20 +280,34 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     return mediana_proyectada, percentil_inferior, percentil_superior
 
 # ==============================================================================
-# DICCIONARIOS Y CONFIGURACIONES DE MERCADO
+# DICCIONARIOS Y CONFIGURACIONES DE MERCADO (AMPLIADOS INTERNACIONALMENTE)
 # ==============================================================================
 DIVISAS = {
     "USD": "Dólar Estadounidense (USD)", "PEN": "Sol Peruano (PEN)", "EUR": "Euro (EUR)",
     "GBP": "Libra Esterlina (GBP)", "JPY": "Yen Japonés (JPY)", "MXN": "Peso Mexicano (MXN)",
-    "CLP": "Peso Chileno (CLP)", "COP": "Peso Colombiano (COP)", "BRL": "Real Brasileño (BRL)"
+    "CLP": "Peso Chileno (CLP)", "COP": "Peso Colombiano (COP)", "BRL": "Real Brasileño (BRL)",
+    "CNY": "Yuan Chino (CNY)", "RUB": "Rublo Ruso (RUB)", "AED": "Dirham de EAU (AED)",
+    "KRW": "Won Surcoreano (KRW)", "CHF": "Franco Suizo (CHF)", "CAD": "Dólar Canadiense (CAD)"
 }
-TASAS_CAMBIO_USD = {"USD ($)": 1.0, "PEN (S/.)": 3.75, "CLP ($)": 950.0, "BRL (R$)": 5.50, "MXN ($)": 19.50}
-SIMBOLOS_MONEDA = {"USD ($)": "$", "PEN (S/.)": "S/.", "CLP ($)": "$ CLP", "BRL (R$)": "R$", "MXN ($)": "$ MXN"}
-MINIMOS_MONEDA = {"USD ($)": 20.0, "PEN (S/.)": 75.0, "CLP ($)": 19000.0, "BRL (R$)": 110.0, "MXN ($)": 390.0}
+
+SIMBOLOS_MONEDA = {
+    "USD ($)": "$", "PEN (S/.)": "S/.", "CLP ($)": "$ CLP", "BRL (R$)": "R$", "MXN ($)": "$ MXN",
+    "EUR (€)": "€", "GBP (£)": "£", "JPY (¥)": "¥", "CNY (¥)": "¥ CNY", "RUB (₽)": "₽", "AED (د.إ)": "AED"
+}
+
+MINIMOS_MONEDA = {
+    "USD ($)": 20.0, "PEN (S/.)": 75.0, "CLP ($)": 19000.0, "BRL (R$)": 110.0, "MXN ($)": 390.0,
+    "EUR (€)": 20.0, "GBP (£)": 15.0, "JPY (¥)": 3000.0, "CNY (¥)": 150.0, "RUB (₽)": 1800.0, "AED (د.إ)": 75.0
+}
+
+TASAS_CAMBIO_USD = {
+    "USD ($)": 1.0, "PEN (S/.)": 3.75, "CLP ($)": 950.0, "BRL (R$)": 5.50, "MXN ($)": 19.50,
+    "EUR (€)": 0.92, "GBP (£)": 0.78, "JPY (¥)": 150.0, "CNY (¥)": 7.20, "RUB (₽)": 95.0, "AED (د.إ)": 3.67
+}
 
 TASAS_REFERENCIA_PAIS = {
     "USD": 4.50, "PEN": 4.75, "EUR": 3.25, "GBP": 4.50, "CLP": 5.00, 
-    "MXN": 10.00, "BRL": 11.25, "JPY": 0.50, "COP": 9.50
+    "MXN": 10.00, "BRL": 11.25, "JPY": 0.50, "COP": 9.50, "CNY": 3.45, "RUB": 16.00, "AED": 4.50
 }
 
 MERCADOS = {
@@ -314,66 +320,70 @@ MERCADOS = {
         "SPCCPI1.LM": "Southern Copper Corp. (BVL)", "BAP": "Credicorp Ltd.", 
         "IFS": "Intercorp Financial Services", "CPACEN1.LM": "Cementos Pacasmayo", 
         "ALICORC1.LM": "Alicorp S.A.A.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+    },
+    "Bolsa Mexicana de Valores (BMV - México)": {
+        "WALMEX.MX": "Wal-Mart de México", "AMXL.MX": "América Móvil", 
+        "GFNORTEO.MX": "Grupo Financiero Banorte", "CEMEXCPO.MX": "Cemex S.A.B.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+    },
+    "Bolsa de Santiago (BCS - Chile)": {
+        "SQM-B.CL": "Sociedad Química y Minera de Chile", "BSANTANDER.CL": "Banco Santander Chile", 
+        "CHILE.CL": "Banco de Chile", "ENELAM.CL": "Enel Américas S.A.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+    },
+    "B3 Brasil (Bolsa de São Paulo - Brasil)": {
+        "PETR4.SA": "Petróleo Brasileiro (Petrobras)", "VALE3.SA": "Vale S.A.", 
+        "ITUB4.SA": "Itaú Unibanco Holding", "BBDC4.SA": "Banco Bradesco S.A.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+    },
+    "Tokyo Stock Exchange (TSE - Japón)": {
+        "7203.T": "Toyota Motor Corp.", "6758.T": "Sony Group Corp.", 
+        "9984.T": "SoftBank Group Corp.", "6861.T": "Keyence Corp.", "🔍 Buscar otro Ticker manually": "CUSTOM"
+    },
+    "Korea Exchange (KRX - Corea del Sur)": {
+        "005930.KS": "Samsung Electronics", "000660.KS": "SK Hynix", 
+        "373220.KS": "LG Energy Solution", "005380.KS": "Hyundai Motor", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+    },
+    "Shanghai & Hong Kong Stock Exchange (China)": {
+        "0700.HK": "Tencent Holdings", "9988.HK": "Alibaba Group Holding", 
+        "600519.SS": "Kweichow Moutai", "0388.HK": "HKEX", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+    },
+    "Moscow Exchange (MOEX - Rusia)": {
+        "GAZP.ME": "Gazprom PJSC", "SBER.ME": "Sberbank of Russia", 
+        "LKOH.ME": "Lukoil PJSC", "ROSN.ME": "Rosneft PJSC", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+    },
+    "Euronext & Bolsa de Frankfurt (Europa)": {
+        "ASML.AS": "ASML Holding N.V. (Países Bajos)", "SAP.DE": "SAP SE (Alemania)", 
+        "MC.PA": "LVMH Moët Hennessy (Francia)", "SIE.DE": "Siemens AG (Alemania)", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
     }
 }
 
 CONTEXTO_GLOBAL_INSTITUCIONAL = """
 [CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL VIGENTE]: 
-1. Bancos Centrales (FED, BCE, BCRP): Tasas de referencia y política monetaria.
+1. Bancos Centrales (FED, BCE, BCRP, PBoC, BoJ): Tasas de referencia y política monetaria global.
 2. Modelos Cuantitativos y Estocásticos: Simulación de Monte Carlo (GBM), VaR y análisis fundamental por activo.
 """
 
-def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
-    tasa_destino = TASAS_CAMBIO_USD[moneda_destino_key]
-    base_upper = str(moneda_base_asset).upper()
-    if "PEN" in base_upper or "SOL" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["PEN (S/.)"]
-    elif "BRL" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["BRL (R$)"]
-    elif "CLP" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["CLP ($)"]
-    elif "MXN" in base_upper:
-        tasa_base_usd = TASAS_CAMBIO_USD["MXN ($)"]
-    else:
-        tasa_base_usd = 1.0
-    return (1.0 / tasa_base_usd) * tasa_destino
-
-def obtener_historial_forex(base_curr, target_curr):
+def obtener_tipo_cambio_real(moneda_base_ticker, moneda_destino_key):
     try:
-        if base_curr == target_curr:
-            fechas_dummy = pd.date_range(end=pd.Timestamp.now(), periods=1260, freq="B")
-            return pd.DataFrame({"Close": 1.0}, index=fechas_dummy)
+        base_limpia = moneda_base_ticker.upper()
+        target_limpio = moneda_destino_key[:3].upper()
+        if base_limpia == target_limpio:
+            return 1.0, "Paridad Idéntica (1:1)"
         
-        ticker_directo = f"{base_curr}{target_curr}=X"
-        df_directo = yf.Ticker(ticker_directo).history(period="5y")
-        if not df_directo.empty and len(df_directo) > 10:
-            return df_directo[["Close"]]
+        paridad_ticker = f"{base_limpia}{target_limpio}=X"
+        df_fx = yf.Ticker(paridad_ticker).history(period="5d")
+        if not df_fx.empty:
+            return float(df_fx["Close"].iloc[-1]), f"Yahoo Finance Spot ({paridad_ticker})"
             
-        ticker_inverso = f"{target_curr}{base_curr}=X"
-        df_inverso = yf.Ticker(ticker_inverso).history(period="5y")
-        if not df_inverso.empty and len(df_inverso) > 10:
-            df_inverso["Close"] = 1.0 / df_inverso["Close"]
-            return df_inverso[["Close"]]
-            
-        df_base_usd = yf.Ticker(f"{base_curr}USD=X").history(period="5y") if base_curr != "USD" else None
-        df_target_usd = yf.Ticker(f"{target_curr}USD=X").history(period="5y") if target_curr != "USD" else None
-        
-        if base_curr == "USD" and df_target_usd is not None and not df_target_usd.empty:
-            df_resultado = pd.DataFrame(index=df_target_usd.index)
-            df_resultado["Close"] = 1.0 / df_target_usd["Close"]
-            return df_resultado
-        elif target_curr == "USD" and df_base_usd is not None and not df_base_usd.empty:
-            df_resultado = pd.DataFrame(index=df_base_usd.index)
-            df_resultado["Close"] = df_base_usd["Close"]
-            return df_resultado
-        elif df_base_usd is not None and df_target_usd is not None and not df_base_usd.empty and not df_target_usd.empty:
-            df_combinado = pd.concat([df_base_usd["Close"], df_target_usd["Close"]], axis=1, keys=["b", "t"]).dropna()
-            df_resultado = pd.DataFrame(index=df_combinado.index)
-            df_resultado["Close"] = df_combinado["b"] / df_combinado["t"]
-            return df_resultado
+        paridad_inversa = f"{target_limpio}{base_limpia}=X"
+        df_inv = yf.Ticker(paridad_inversa).history(period="5d")
+        if not df_inv.empty:
+            val_inv = float(df_inv["Close"].iloc[-1])
+            if val_inv > 0:
+                return (1.0 / val_inv), f"Yahoo Finance Spot Inverso ({paridad_inversa})"
     except Exception:
         pass
-    return pd.DataFrame()
+    
+    tasa_def = TASAS_CAMBIO_USD.get(moneda_destino_key, 1.0)
+    return tasa_def, "Tasa Institucional de Referencia / Banco Central"
 
 # ==============================================================================
 # ENCABEZADO Y TABS DE NAVEGACIÓN INSTITUCIONAL
@@ -398,11 +408,11 @@ with tab_acciones:
             opcion_accion = st.selectbox(
                 "📊 Selección de Acción / Ticker:",
                 list(diccionario_acciones.keys()),
-                format_func=lambda x: f"{x} - {diccionario_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}",
+                format_func=lambda x: f"{x} - {diccionario_acciones[x] if 'Buscar' not in x else 'Escribir Ticker'}",
                 key="stock_accion"
             )
-            if opcion_accion == "🔍 Buscar otro Ticker manualmente":
-                ticker_final = st.text_input("Ingrese Ticker (ej: AMD, MELI):", value="AAPL", key="stock_ticker_manual").upper()
+            if "Buscar" in opcion_accion:
+                ticker_final = st.text_input("Ingrese Ticker (ej: AAPL, 7203.T, PETR4.SA):", value="AAPL", key="stock_ticker_manual").upper()
                 nombre_empresa = ticker_final
             else:
                 ticker_final = opcion_accion
@@ -446,13 +456,13 @@ with tab_acciones:
                         info_stock = {}
                         
                     moneda_base_ticker = info_stock.get("currency", "USD")
-                    factor_conversion_ticker = obtener_factor_conversion(moneda_base_ticker, moneda_sel)
+                    tasa_conv_real, fuente_tasa = obtener_tipo_cambio_real(moneda_base_ticker, moneda_sel)
 
-                    precio_actual = df_stock["Close"].iloc[-1] * factor_conversion_ticker
-                    df_stock["Close_Moneda"] = df_stock["Close"] * factor_conversion_ticker
+                    precio_actual = df_stock["Close"].iloc[-1] * tasa_conv_real
+                    df_stock["Close_Moneda"] = df_stock["Close"] * tasa_conv_real
                     
                     market_cap_raw = info_stock.get("marketCap")
-                    market_cap = market_cap_raw * factor_conversion_ticker if market_cap_raw else 0.0
+                    market_cap = market_cap_raw * tasa_conv_real if market_cap_raw else 0.0
                     
                     pe_ratio = f"{info_stock.get('trailingPE'):.2f}" if info_stock.get("trailingPE") else "No reportado"
                     pb_ratio = f"{info_stock.get('priceToBook'):.2f}" if info_stock.get("priceToBook") else "No reportado"
@@ -464,40 +474,36 @@ with tab_acciones:
                     volatilidad_anualizada = df_stock["Retorno_Diario"].std() * np.sqrt(252)
                     var_diario_95 = np.percentile(df_stock["Retorno_Diario"].dropna(), 5)
 
-                    # Apartado informativo del Tipo de Cambio si la moneda de operación difiere de la moneda del activo
-                    if moneda_base_ticker.upper() != moneda_sel[:3].upper():
-                        st.markdown(f"""
-                        <div class="fx-conv-box">
-                            🔀 <strong>Nota de Conversión Cambiaria:</strong> El activo cotiza originalmente en <strong>{moneda_base_ticker.upper()}</strong>, pero estás operando en <strong>{moneda_sel}</strong>. Se aplicó un factor de conversión institucional de <strong>{factor_conversion_ticker:.4f}</strong> (Tasa de referencia cruzada con el tipo de cambio spot).
-                        </div>
-                        """, unsafe_allow_html=True)
-
                     st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
-                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                    
+                    c_m1, c_m2, c_m3, c_m4, c_m5 = st.columns(5)
                     with c_m1:
                         st.metric(f"Precio Actual ({simbolo_moneda})", f"{simbolo_moneda} {precio_actual:,.2f}")
-                        st.markdown("<div class='source-note'>Nota: Yahoo Finance / BCRP (Tasa Spot)</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='source-note'>Nota: Yahoo Finance / Spot ({moneda_base_ticker})</div>", unsafe_allow_html=True)
                     with c_m2:
+                        st.metric("Tipo de Cambio Spot", f"{tasa_conv_real:,.4f}")
+                        st.markdown(f"<div class='source-note'>Nota: {fuente_tasa}</div>", unsafe_allow_html=True)
+                    with c_m3:
                         st.metric("PER (Price / Earnings)", f"{pe_ratio}")
                         st.markdown("<div class='source-note'>Nota: Yahoo Finance Fundamentals</div>", unsafe_allow_html=True)
-                    with c_m3:
-                        st.metric("Volatilidad Anualizada", f"{volatilidad_anualizada:.2%}")
-                        st.markdown("<div class='source-note'>Nota: Modelo Econométrico GBM (5A)</div>", unsafe_allow_html=True)
                     with c_m4:
+                        st.metric("Volatilidad Anualizada", f"{volatilidad_anualizada:.2%}")
+                        st.markdown("<div class='source-note'>Nota: Modelo GBM Estocástico (5A)</div>", unsafe_allow_html=True)
+                    with c_m5:
                         st.metric("Margen Beneficio Neto", f"{margin_str}")
                         st.markdown("<div class='source-note'>Nota: Estados Financieros YF</div>", unsafe_allow_html=True)
 
-                    c_m5, c_m6, c_m7, c_m8 = st.columns(4)
-                    with c_m5:
-                        st.metric(f"Cap. de Mercado ({simbolo_moneda})", f"{simbolo_moneda} {market_cap:,.0f}" if market_cap > 0 else "No reportado")
-                        st.markdown("<div class='source-note'>Nota: Yahoo Finance Market Cap</div>", unsafe_allow_html=True)
+                    c_m6, c_m7, c_m8, c_m9 = st.columns(4)
                     with c_m6:
+                        st.metric(f"Cap. de Mercado ({simbolo_moneda})", f"{simbolo_moneda} {market_cap:,.0f}" if market_cap > 0 else "No reportado")
+                        st.markdown("<div class='source-note'>Nota: Capitalización Bursátil YF</div>", unsafe_allow_html=True)
+                    with c_m7:
                         st.metric("Ratio P/B", f"{pb_ratio}")
                         st.markdown("<div class='source-note'>Nota: Balance General Consolidado</div>", unsafe_allow_html=True)
-                    with c_m7:
+                    with c_m8:
                         st.metric("Rendimiento Dividendo", f"{dividend_str}")
                         st.markdown("<div class='source-note'>Nota: Historial de Dividendos YF</div>", unsafe_allow_html=True)
-                    with c_m8:
+                    with c_m9:
                         st.metric("VaR 95% Diarios", f"{var_diario_95:.2%}")
                         st.markdown("<div class='source-note'>Nota: Simulación VaR Histórico</div>", unsafe_allow_html=True)
 
@@ -559,14 +565,6 @@ with tab_acciones:
 
             if datos_cargados_exitosamente:
                 st.markdown("## 📋 Dictamen Estratégico Cuantitativo Institucional")
-
-                paquete_datos_analisis = f"""
-                Activo Analizado: {ticker_final} ({nombre_empresa}) | Sector: {sector_empresa}
-                Precio Spot Actual: {simbolo_moneda} {precio_actual:,.2f} | Capital Disponible: {simbolo_moneda} {capital_input:,.2f}
-                Horizonte Temporal: {horizonte} | Perfil de Riesgo del Inversor: {perfil_riesgo}
-                Ratio PER: {pe_ratio} | Ratio P/B: {pb_ratio} | Volatilidad Anualizada: {volatilidad_anualizada:.2%} | VaR 95%: {var_diario_95:.2%}
-                {CONTEXTO_GLOBAL_INSTITUCIONAL}
-                """
 
                 prompt_ia_stock = f"""
                 Actúa como el Director de Análisis Cuantitativo y Gestor de Portafolios de un Fondo de Inversión Global (Hedge Fund).
@@ -674,7 +672,7 @@ with tab_forex:
                         st.metric("Tipo de Cambio Spot", f"{rate_actual:,.4f}")
                         st.markdown("<div class='source-note'>Nota: Yahoo Finance FX Interbank</div>", unsafe_allow_html=True)
                     with c_x2:
-                        st.metric(f"Tasa Ref. {base_curr} (FED/Central)", f"{tasa_base_ref:.2f}%")
+                        st.metric(f"Tasa Ref. {base_curr} (Central)", f"{tasa_base_ref:.2f}%")
                         st.markdown("<div class='source-note'>Nota: Banco Central Base</div>", unsafe_allow_html=True)
                     with c_x3:
                         st.metric(f"Tasa Ref. {target_curr} (Central)", f"{tasa_target_ref:.2f}%")
@@ -694,7 +692,7 @@ with tab_forex:
                         st.metric("Variación Histórica 5A", f"{variacion_5y:+.2f}%")
                         st.markdown("<div class='source-note'>Nota: Retorno Histórico Quinquenal</div>", unsafe_allow_html=True)
                     with c_x8:
-                        st.metric("Spread Cambiario Est. (% min)", "0.15%")
+                        st.metric("Spread Cambiario Est.", "0.15%")
                         st.markdown("<div class='source-note'>Nota: Costo Promedio Interbancario</div>", unsafe_allow_html=True)
 
                     st.markdown("---")
