@@ -255,7 +255,6 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
     
-    # Factores estrictamente calibrados para evitar proyecciones exageradas o irreales
     factor_escala = 0.18 if es_forex else 0.25
     drift_suavizado = 0.05 * mu_diario
     sigma_calibrado = sigma_diario * factor_escala
@@ -476,6 +475,7 @@ with tab_acciones:
 
                     st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
                     
+                    # 9 Tarjetas con sus Notas integradas DENTRO de los recuadros
                     c_m1, c_m2, c_m3, c_m4, c_m5 = st.columns(5)
                     with c_m1:
                         st.metric(f"Precio Actual ({simbolo_moneda})", f"{simbolo_moneda} {precio_actual:,.2f}")
