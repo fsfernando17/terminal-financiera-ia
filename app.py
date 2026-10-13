@@ -1,6 +1,8 @@
+import json
 import re
 import time
 from google import genai
+from google.genai import types
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -15,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Estilos CSS Personalizados de Grado Terminal Financiera
+# Estilos CSS Personalizados
 st.markdown(
     """
     <style>
@@ -41,56 +43,25 @@ st.markdown(
         border-radius: 8px !important;
     }
 
-    /* Módulos de informe estratégico */
-    .report-card {
-        background-color: #111827;
-        border: 1px solid #1f2937;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    /* Subtítulos Markdown (H3) */
+    .stMarkdown h3, div[data-testid="stMarkdownContainer"] h3 {
+        color: #38bdf8 !important;
+        font-weight: 700 !important;
+        font-size: 1.15rem !important;
+        margin-top: 0.2rem !important;
+        margin-bottom: 0.5rem !important;
     }
 
-    /* Badges de Veredicto Dinámico */
-    .verdict-badge-comprar {
-        background-color: rgba(16, 185, 129, 0.15);
-        border: 1px solid #10b981;
-        color: #34d399;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-weight: 800;
-        display: inline-block;
-        font-size: 1.1rem;
-        letter-spacing: 0.05em;
-    }
-    
-    .verdict-badge-desestimar {
-        background-color: rgba(239, 68, 68, 0.15);
-        border: 1px solid #ef4444;
-        color: #f87171;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-weight: 800;
-        display: inline-block;
-        font-size: 1.1rem;
-        letter-spacing: 0.05em;
-    }
-
-    .verdict-badge-observacion {
-        background-color: rgba(245, 158, 11, 0.15);
-        border: 1px solid #f59e0b;
-        color: #fbbf24;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-weight: 800;
-        display: inline-block;
-        font-size: 1.1rem;
-        letter-spacing: 0.05em;
+    /* Párrafos y listas */
+    .stMarkdown p, div[data-testid="stMarkdownContainer"] p, div[data-testid="stMarkdownContainer"] li {
+        color: #e5e7eb !important;
+        font-size: 0.93rem !important;
+        line-height: 1.6 !important;
     }
 
     /* Títulos y Métricas */
     h1 { color: #ffffff !important; font-weight: 800 !important; }
-    h2, h3 { color: #38bdf8 !important; font-weight: 700 !important; }
+    h2 { color: #38bdf8 !important; font-weight: 700 !important; }
     
     [data-testid="stMetric"] {
         background-color: #111827;
@@ -118,6 +89,40 @@ st.markdown(
         box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
     }
 
+    /* Caja de Veredicto Inferior (Insignia Impactante) */
+    .decision-box {
+        text-align: center;
+        border-radius: 12px;
+        padding: 20px 10px;
+        font-weight: 800;
+        font-size: 1.25rem;
+        letter-spacing: 0.05em;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 125px;
+    }
+
+    .decision-comprar {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.45) 100%);
+        border: 2px solid #10b981;
+        color: #34d399;
+    }
+
+    .decision-desestimar {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.45) 100%);
+        border: 2px solid #ef4444;
+        color: #f87171;
+    }
+
+    .decision-observacion {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.45) 100%);
+        border: 2px solid #f59e0b;
+        color: #fbbf24;
+    }
+
     /* Descargo Legal */
     .disclaimer-box {
         background-color: #17120a;
@@ -138,36 +143,47 @@ api_key_oculta = st.secrets.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
 
-# SISTEMA DE CONEXIÓN CON REINTENTOS Y PAUSAS INTELIGENTES (ANTI-503)
+# SISTEMA IA CON RESPUESTA ESTRUCTURADA EN JSON (MODELOS OFICIALES DE TU CONSOLA)
 def generar_respuesta_ia_rapida(client, prompt):
-  modelos_validos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
-  ultimo_error = None
+    modelos_validos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
+    ultimo_error = None
 
-  for modelo in modelos_validos:
-    for intento in range(3):
-      try:
-        response = client.models.generate_content(
-            model=modelo, contents=prompt
-        )
-        if response and response.text:
-          return response.text
-      except Exception as e:
-        ultimo_error = e
-        err_str = str(e)
-        if (
-            "503" in err_str
-            or "UNAVAILABLE" in err_str
-            or "429" in err_str
-            or "RESOURCE_EXHAUSTED" in err_str
-        ):
-          time.sleep(1.5 * (intento + 1))
-        else:
-          break
+    config = types.GenerateContentConfig(
+        temperature=0.2,
+        max_output_tokens=1000,
+        response_mime_type="application/json"
+    )
 
-  raise Exception(f"Detalle de servicio API: {str(ultimo_error)}")
+    for modelo in modelos_validos:
+        for intento in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=modelo, contents=prompt, config=config
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                ultimo_error = e
+                err_str = str(e)
+                if any(
+                    err in err_str
+                    for err in [
+                        "500", "503", "429", "INTERNAL", "UNAVAILABLE", "RESOURCE_EXHAUSTED"
+                    ]
+                ):
+                    time.sleep(0.8 * (intento + 1))
+                else:
+                    break
+
+    raise Exception(f"Detalle de servicio API: {str(ultimo_error)}")
 
 
-# --- DICCIONARIOS Y TASAS DE CONVERSIÓN ---
+# --- DICCIONARIOS, Mapeo de Tickers y TASAS DE CONVERSIÓN ---
+TICKER_MAP = {
+    "SPCCPI1.LM": "SCCO",
+    "SPCCPI2.LM": "SCCO",
+}
+
 TASAS_CAMBIO_USD = {
     "USD ($)": 1.0,
     "PEN (S/.)": 3.75,
@@ -209,8 +225,8 @@ MERCADOS = {
     },
     "Bolsa de Valores de Lima (BVL - Perú)": {
         "SPCCPI1.LM": "Southern Copper Corp. (Acc. Inversión BVL - PEN)",
+        "SCCO": "Southern Copper Corp. (NYSE / BVL - USD)",
         "BAP": "Credicorp Ltd. (USD)",
-        "SCCO": "Southern Copper Corp. (NYSE ADR - USD)",
         "IFS": "Intercorp Financial Services (USD)",
         "BVN": "Compañía de Minas Buenaventura (USD)",
         "CPACEN1.LM": "Cementos Pacasmayo (PEN)",
@@ -233,93 +249,90 @@ MERCADOS = {
 
 # NORMALIZACIÓN DINÁMICA DE DIVISA BASE A DIVISA DESTINO
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
-  tasa_destino = TASAS_CAMBIO_USD[moneda_destino_key]
+    tasa_destino = TASAS_CAMBIO_USD[moneda_destino_key]
 
-  base_upper = str(moneda_base_asset).upper()
-  if "PEN" in base_upper or "SOL" in base_upper:
-    tasa_base_usd = TASAS_CAMBIO_USD["PEN (S/.)"]
-  elif "BRL" in base_upper:
-    tasa_base_usd = TASAS_CAMBIO_USD["BRL (R$)"]
-  elif "CLP" in base_upper:
-    tasa_base_usd = TASAS_CAMBIO_USD["CLP ($)"]
-  elif "MXN" in base_upper:
-    tasa_base_usd = TASAS_CAMBIO_USD["MXN ($)"]
-  else:
-    tasa_base_usd = 1.0  # Por defecto USD
+    base_upper = str(moneda_base_asset).upper()
+    if "PEN" in base_upper or "SOL" in base_upper:
+        tasa_base_usd = TASAS_CAMBIO_USD["PEN (S/.)"]
+    elif "BRL" in base_upper:
+        tasa_base_usd = TASAS_CAMBIO_USD["BRL (R$)"]
+    elif "CLP" in base_upper:
+        tasa_base_usd = TASAS_CAMBIO_USD["CLP ($)"]
+    elif "MXN" in base_upper:
+        tasa_base_usd = TASAS_CAMBIO_USD["MXN ($)"]
+    else:
+        tasa_base_usd = 1.0  # Por defecto USD
 
-  # Convertir precio base a USD y luego a la moneda de destino seleccionada
-  return (1.0 / tasa_base_usd) * tasa_destino
+    return (1.0 / tasa_base_usd) * tasa_destino
 
 
 # --- ENCABEZADO PRINCIPAL ---
 st.title("📈 Asistente Inteligente de Inversiones Bursátiles")
 st.markdown(
-    "<p style='color: #9ca3af; font-size: 1.05rem; margin-bottom:"
-    " 25px;'>Terminal cuantitativa, fundamental y econométrica para la"
-    " evaluación estratégica de activos financieros globales.</p>",
+    "<p style='color: #9ca3af; font-size: 1.05rem; margin-bottom: 25px;'>Terminal cuantitativa, fundamental y econométrica para la evaluación estratégica de activos financieros globales (Análisis a 5 Años).</p>",
     unsafe_allow_html=True,
 )
 
 # --- PANEL DE CONFIGURACIÓN ---
 with st.container(border=True):
-  st.subheader("⚙️ Parámetros Operativos de Inversión")
+    st.subheader("⚙️ Parámetros Operativos de Inversión")
 
-  col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-  with col1:
-    mercado_sel = st.selectbox("🌍 Mercado de Origen:", list(MERCADOS.keys()))
+    with col1:
+        mercado_sel = st.selectbox("🌍 Mercado de Origen:", list(MERCADOS.keys()))
 
-  dic_acciones = MERCADOS[mercado_sel]
+    dic_acciones = MERCADOS[mercado_sel]
 
-  with col2:
-    opcion_accion = st.selectbox(
-        "📊 Selección de Acción / Ticker:",
-        list(dic_acciones.keys()),
-        format_func=lambda x: (
-            f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}"
-        ),
-    )
+    with col2:
+        opcion_accion = st.selectbox(
+            "📊 Selección de Acción / Ticker:",
+            list(dic_acciones.keys()),
+            format_func=lambda x: (
+                f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}"
+            ),
+        )
 
-    if opcion_accion == "🔍 Buscar otro Ticker manualmente":
-      ticker_final = st.text_input(
-          "Ingrese Ticker oficial de Yahoo Finance (ej: AMD, MELI, PBR):",
-          value="NVDA",
-      ).upper()
-      nombre_empresa = ticker_final
-    else:
-      ticker_final = opcion_accion
-      nombre_empresa = dic_acciones[opcion_accion]
+        if opcion_accion == "🔍 Buscar otro Ticker manualmente":
+            ticker_final = st.text_input(
+                "Ingrese Ticker oficial de Yahoo Finance (ej: AMD, MELI, PBR):",
+                value="AAPL",
+            ).upper()
+            nombre_empresa = ticker_final
+        else:
+            ticker_final = opcion_accion
+            nombre_empresa = dic_acciones[opcion_accion]
 
-  with col3:
-    moneda_sel = st.selectbox("💵 Moneda de Operación:", list(TASAS_CAMBIO_USD.keys()))
+    with col3:
+        moneda_sel = st.selectbox("💵 Moneda de Operación:", list(TASAS_CAMBIO_USD.keys()))
 
-  simb = SIMBOLOS_MONEDA[moneda_sel]
-  monto_min = MINIMOS_MONEDA[moneda_sel]
+    simb = SIMBOLOS_MONEDA[moneda_sel]
+    monto_min = MINIMOS_MONEDA[moneda_sel]
 
-  col4, col5, col6 = st.columns(3)
+    col4, col5, col6 = st.columns(3)
 
-  with col4:
-    capital_input = st.number_input(
-        f"💰 Capital Disponible ({simb}):",
-        min_value=monto_min,
-        value=monto_min * 10,
-        step=monto_min,
-    )
+    with col4:
+        capital_input = st.number_input(
+            f"💰 Capital Disponible ({simb}):",
+            min_value=monto_min,
+            value=monto_min * 10,
+            step=monto_min,
+        )
 
-  with col5:
-    horizonte = st.selectbox(
-        "⏱️ Horizonte Temporal:",
-        [
-            "Corto Plazo (1 a 3 meses)",
-            "Mediano Plazo (6 meses a 1 año)",
-            "Largo Plazo (1 año a más)",
-        ],
-    )
+    with col5:
+        horizonte = st.selectbox(
+            "⏱️ Horizonte Temporal:",
+            [
+                "Corto Plazo (1 a 3 meses)",
+                "Mediano Plazo (6 meses a 1 año)",
+                "Largo Plazo (1 año a más)",
+            ],
+        )
 
-  with col6:
-    perfil_riesgo = st.selectbox(
-        "🛡️ Perfil del Inversor:", ["Conservador", "Moderado", "Agresivo"]
-    )
+    with col6:
+        perfil_riesgo = st.selectbox(
+            "🛡️ Perfil del Inversor:", ["Conservador", "Moderado", "Agresivo"]
+        )
 
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
@@ -328,260 +341,314 @@ if st.button(
     "🚀 Ejecutar Análisis Multidimensional y Proyección",
     use_container_width=True,
 ):
-  if not api_key_oculta or not client:
-    st.error(
-        "⚠️ El servicio de Inteligencia Artificial no está configurado en el"
-        " servidor (Falta la clave GEMINI_API_KEY en Secrets)."
-    )
-  else:
-    with st.spinner(
-        "Procesando datos financieros y ejecutando modelos econométricos para"
-        f" {ticker_final}..."
-    ):
-      try:
-        stock = yf.Ticker(ticker_final)
-        df = stock.history(period="1y")
-        info = stock.info
+    if not api_key_oculta or not client:
+        st.error(
+            "⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta la clave GEMINI_API_KEY en Secrets)."
+        )
+    else:
+        # 1. PASO BURSÁTIL Y CUANTITATIVO (CON FALLBACK DE TICKERS)
+        datos_cargados = False
+        try:
+            # Búsqueda con resolución de mapa
+            search_ticker = TICKER_MAP.get(ticker_final, ticker_final)
+            stock = yf.Ticker(search_ticker)
+            df = stock.history(period="5y")
+            
+            # Intento secundario si finaliza en .LM y vino vacío
+            if df.empty and search_ticker.endswith(".LM"):
+                alt_ticker = search_ticker.replace(".LM", "")
+                stock = yf.Ticker(alt_ticker)
+                df = stock.history(period="5y")
 
-        if df.empty:
-          st.error(
-              "⚠️ No se encontraron registros financieros para el símbolo"
-              f" '{ticker_final}'. Verifique el ticker en Yahoo Finance."
-          )
-        else:
-          # Detección de divisa nativa del activo
-          currency_base = info.get("currency", "USD")
-          factor_conv = obtener_factor_conversion(currency_base, moneda_sel)
+            info = stock.info
 
-          precio_actual_raw = df["Close"].iloc[-1]
-          precio_actual = precio_actual_raw * factor_conv
-          df["Close_Moneda"] = df["Close"] * factor_conv
+            if df.empty:
+                st.error(
+                    f"⚠️ No se encontraron registros financieros para el símbolo '{ticker_final}'. Verifique el ticker en Yahoo Finance."
+                )
+            else:
+                datos_cargados = True
+                currency_base = info.get("currency", "USD")
+                factor_conv = obtener_factor_conversion(currency_base, moneda_sel)
 
-          # Datos fundamentales
-          market_cap = (
-              info.get("marketCap", 0) * factor_conv
-              if info.get("marketCap")
-              else 0
-          )
-          pe_ratio_raw = info.get("trailingPE", "N/A")
-          pe_ratio = (
-              f"{pe_ratio_raw:.2f}"
-              if isinstance(pe_ratio_raw, (int, float))
-              else str(pe_ratio_raw)
-          )
+                precio_actual_raw = df["Close"].iloc[-1]
+                precio_actual = precio_actual_raw * factor_conv
+                df["Close_Moneda"] = df["Close"] * factor_conv
 
-          pb_ratio_raw = info.get("priceToBook", "N/A")
-          pb_ratio = (
-              f"{pb_ratio_raw:.2f}"
-              if isinstance(pb_ratio_raw, (int, float))
-              else str(pb_ratio_raw)
-          )
+                # Datos fundamentales
+                market_cap = (
+                    info.get("marketCap", 0) * factor_conv
+                    if info.get("marketCap")
+                    else 0
+                )
+                pe_ratio_raw = info.get("trailingPE", "N/A")
+                pe_ratio = (
+                    f"{pe_ratio_raw:.2f}"
+                    if isinstance(pe_ratio_raw, (int, float))
+                    else str(pe_ratio_raw)
+                )
 
-          dividend_yield = info.get("dividendYield", 0)
-          dividend_str = (
-              f"{dividend_yield*100:.2f}%" if dividend_yield else "0.00%"
-          )
-          profit_margin = info.get("profitMargins", 0)
-          margin_str = (
-              f"{profit_margin*100:.2f}%" if profit_margin else "N/A"
-          )
-          sector = info.get("sector", "General / No especificado")
+                pb_ratio_raw = info.get("priceToBook", "N/A")
+                pb_ratio = (
+                    f"{pb_ratio_raw:.2f}"
+                    if isinstance(pb_ratio_raw, (int, float))
+                    else str(pb_ratio_raw)
+                )
 
-          # Métricas Cuantitativas
-          df["Retorno_Diario"] = df["Close"].pct_change()
-          volatilidad_anual = df["Retorno_Diario"].std() * np.sqrt(252)
-          retorno_medio_diario = df["Retorno_Diario"].mean()
-          var_95 = np.percentile(df["Retorno_Diario"].dropna(), 5)
+                dividend_yield = info.get("dividendYield", 0)
+                dividend_str = (
+                    f"{dividend_yield*100:.2f}%" if dividend_yield else "0.00%"
+                )
+                profit_margin = info.get("profitMargins", 0)
+                margin_str = (
+                    f"{profit_margin*100:.2f}%" if profit_margin else "N/A"
+                )
+                sector = info.get("sector", "General / No especificado")
 
-          sma_50 = df["Close_Moneda"].rolling(window=50).mean().iloc[-1]
-          sma_200 = (
-              df["Close_Moneda"].rolling(window=200).mean().iloc[-1]
-              if len(df) >= 200
-              else sma_50
-          )
+                # Métricas Cuantitativas calculadas sobre los 5 años
+                df["Retorno_Diario"] = df["Close"].pct_change()
+                volatilidad_anual = df["Retorno_Diario"].std() * np.sqrt(252)
+                retorno_medio_diario = df["Retorno_Diario"].mean()
+                var_95 = np.percentile(df["Retorno_Diario"].dropna(), 5)
 
-          # --- PANEL DE INDICADORES (KPIS) ---
-          st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos")
+                sma_50 = df["Close_Moneda"].rolling(window=50).mean().iloc[-1]
+                sma_200 = (
+                    df["Close_Moneda"].rolling(window=200).mean().iloc[-1]
+                    if len(df) >= 200
+                    else sma_50
+                )
 
-          c_m1, c_m2, c_m3, c_m4 = st.columns(4)
-          c_m1.metric(
-              f"Precio Actual ({simb})", f"{simb} {precio_actual:,.2f}"
-          )
-          c_m2.metric("PER (Price / Earnings)", f"{pe_ratio}")
-          c_m3.metric("Volatilidad Anualizada", f"{volatilidad_anual:.2%}")
-          c_m4.metric("Margen Beneficio Neto", f"{margin_str}")
+                # --- MOSTRAR PANEL DE KPIS DE INMEDIATO ---
+                st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
 
-          c_m5, c_m6, c_m7, c_m8 = st.columns(4)
-          c_m5.metric(
-              f"Cap. de Mercado ({simb})",
-              f"{simb} {market_cap:,.0f}" if market_cap else "N/A",
-          )
-          c_m6.metric("Ratio P/B", f"{pb_ratio}")
-          c_m7.metric("Rendimiento Dividendo", f"{dividend_str}")
-          c_m8.metric("VaR 95% (Pérdida Máx. Diaria)", f"{var_95:.2%}")
+                c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                c_m1.metric(
+                    f"Precio Actual ({simb})", f"{simb} {precio_actual:,.2f}"
+                )
+                c_m2.metric("PER (Price / Earnings)", f"{pe_ratio}")
+                c_m3.metric("Volatilidad Anualizada (5A)", f"{volatilidad_anual:.2%}")
+                c_m4.metric("Margen Beneficio Neto", f"{margin_str}")
 
-          st.markdown("---")
+                c_m5, c_m6, c_m7, c_m8 = st.columns(4)
+                c_m5.metric(
+                    f"Cap. de Mercado ({simb})",
+                    f"{simb} {market_cap:,.0f}" if market_cap else "N/A",
+                )
+                c_m6.metric("Ratio P/B", f"{pb_ratio}")
+                c_m7.metric("Rendimiento Dividendo", f"{dividend_str}")
+                c_m8.metric("VaR 95% Diarios (5A)", f"{var_95:.2%}")
 
-          # --- GRÁFICO BURSÁTIL PLOTLY ---
-          st.markdown(
-              "### 📈 Comportamiento Histórico & Proyección Econométrica"
-              f" ({horizonte})"
-          )
+                st.markdown("---")
 
-          dias_proy = (
-              60
-              if "1 a 3 meses" in horizonte
-              else (180 if "6 meses a 1 año" in horizonte else 365)
-          )
+                # --- MOSTRAR GRÁFICO PLOTLY CON AUTO-ESCALADO ---
+                st.markdown(
+                    f"### 📈 Comportamiento Histórico a 5 Años & Proyección ({horizonte})"
+                )
 
-          np.random.seed(42)
-          cambios_simulados = np.random.normal(
-              retorno_medio_diario, df["Retorno_Diario"].std(), dias_proy
-          )
-          precios_futuros = [precio_actual]
-          for cambio in cambios_simulados:
-            precios_futuros.append(precios_futuros[-1] * (1 + cambio))
+                dias_proy = (
+                    60
+                    if "1 a 3 meses" in horizonte
+                    else (180 if "6 meses a 1 año" in horizonte else 365)
+                )
 
-          fechas_hist = df.index[-90:]
-          precios_hist = df["Close_Moneda"].tail(90)
-          fechas_futuras = pd.date_range(
-              start=df.index[-1], periods=dias_proy + 1, freq="B"
-          )
+                np.random.seed(42)
+                cambios_simulados = np.random.normal(
+                    retorno_medio_diario, df["Retorno_Diario"].std(), dias_proy
+                )
+                precios_futuros = [precio_actual]
+                for cambio in cambios_simulados:
+                    precios_futuros.append(precios_futuros[-1] * (1 + cambio))
 
-          fig = go.Figure()
+                fechas_hist = df.index
+                precios_hist = df["Close_Moneda"]
+                fechas_futuras = pd.date_range(
+                    start=df.index[-1], periods=dias_proy + 1, freq="B"
+                )
 
-          fig.add_trace(
-              go.Scatter(
-                  x=fechas_hist,
-                  y=precios_hist,
-                  mode="lines",
-                  name="Histórico Reciente (Real)",
-                  line=dict(color="#00e676", width=2.5),
-              )
-          )
+                fig = go.Figure()
 
-          fig.add_trace(
-              go.Scatter(
-                  x=fechas_futuras,
-                  y=precios_futuros,
-                  mode="lines",
-                  name="Proyección Econométrica",
-                  line=dict(color="#e040fb", width=2.5, dash="dash"),
-              )
-          )
+                fig.add_trace(
+                    go.Scatter(
+                        x=fechas_hist,
+                        y=precios_hist,
+                        mode="lines",
+                        name="Histórico Real (5 Años)",
+                        line=dict(color="#00e676", width=2.0),
+                    )
+                )
 
-          fig.update_layout(
-              title=dict(
-                  text=f"Trayectoria de Cotización Estimada - {ticker_final}",
-                  font=dict(size=16, color="#f9fafb"),
-              ),
-              xaxis=dict(
-                  title="Fecha / Periodo de Proyección", gridcolor="#1f2937"
-              ),
-              yaxis=dict(title=f"Precio del Activo ({simb})", gridcolor="#1f2937"),
-              template="plotly_dark",
-              paper_bgcolor="#111827",
-              plot_bgcolor="#111827",
-              height=480,
-              hovermode="x unified",
-              legend=dict(
-                  yanchor="top",
-                  y=0.99,
-                  xanchor="left",
-                  x=0.01,
-                  bgcolor="rgba(17,24,39,0.8)",
-              ),
-          )
+                fig.add_trace(
+                    go.Scatter(
+                        x=fechas_futuras,
+                        y=precios_futuros,
+                        mode="lines",
+                        name="Proyección Econométrica",
+                        line=dict(color="#e040fb", width=2.5, dash="dash"),
+                    )
+                )
 
-          st.plotly_chart(fig, use_container_width=True)
+                fig.update_layout(
+                    title=dict(
+                        text=f"Evolución de Cotización Real (5 Años) y Proyección - {ticker_final}",
+                        font=dict(size=16, color="#f9fafb"),
+                    ),
+                    xaxis=dict(
+                        title="Fecha / Periodo de Proyección", gridcolor="#1f2937"
+                    ),
+                    yaxis=dict(
+                        title=f"Precio del Activo ({simb})",
+                        gridcolor="#1f2937",
+                        zeroline=False,
+                        autorange=True
+                    ),
+                    template="plotly_dark",
+                    paper_bgcolor="#111827",
+                    plot_bgcolor="#111827",
+                    height=500,
+                    hovermode="x unified",
+                    legend=dict(
+                        yanchor="top",
+                        y=0.99,
+                        xanchor="left",
+                        x=0.01,
+                        bgcolor="rgba(17,24,39,0.8)",
+                    ),
+                )
 
-          # --- AVISO LEGAL ---
-          st.markdown(
-              """
-                        <div class="disclaimer-box">
-                            <strong>⚠️ Aviso Legal / Descargo de Responsabilidad:</strong> 
-                            Este modelo genera pronósticos estadísticos basándose estrictamente en datos pasados y condiciones actuales de mercado. 
-                            No es 100% exacto y está expuesto a la volatilidad implícita, eventos macroeconómicos imprevistos y riesgos sistémicos. 
-                            Las proyecciones no constituyen una garantía de rendimiento ni una recomendación directa de compra o venta.
-                        </div>
+                st.plotly_chart(fig, use_container_width=True)
+
+                # --- AVISO LEGAL ---
+                st.markdown(
+                    """
+                    <div class="disclaimer-box">
+                        <strong>⚠️ Aviso Legal / Descargo de Responsabilidad:</strong> 
+                        Este modelo genera pronósticos estadísticos basándose estrictamente en datos pasados de los últimos 5 años y condiciones actuales de mercado. 
+                        No es 100% exacto y está expuesto a la volatilidad implícita, eventos macroeconómicos imprevistos y riesgos sistémicos. 
+                        Las proyecciones no constituyen una garantía de rendimiento ni una recomendación directa de compra o venta.
+                    </div>
                     """,
-              unsafe_allow_html=True,
-          )
+                    unsafe_allow_html=True,
+                )
 
-          st.markdown("---")
+                st.markdown("---")
 
-          # --- PROMPT PARA INFORME EJECUTIVO TIPO TERMINAL FINANCIERA ---
-          paquete_analisis = f"""
-                    Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
-                    Precio Actual: {simb} {precio_actual:,.2f}
-                    Capital disponible: {simb} {capital_input:,.2f}
-                    Moneda: {moneda_sel} | Horizonte: {horizonte} | Perfil: {perfil_riesgo}
+        except Exception as e:
+            st.error(f"Error procesando métricas financieras: {str(e)}")
+
+        # 2. INTELIGENCIA ARTIFICIAL EN MODO JSON (LIGADO AL BOCETO PAINT)
+        if datos_cargados:
+            st.markdown("## 📋 Dictamen Estratégico de Inversión")
+
+            paquete_analisis = f"""
+            Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
+            Precio Actual: {simb} {precio_actual:,.2f}
+            Capital disponible: {simb} {capital_input:,.2f}
+            Moneda: {moneda_sel} | Horizonte: {horizonte} | Perfil: {perfil_riesgo}
+            
+            HISTÓRICO 5 AÑOS & FUNDAMENTALES:
+            - PER: {pe_ratio} | P/B: {pb_ratio} | Dividend Yield: {dividend_str} | Margen Beneficio: {margin_str}
+            - Volatilidad Anualizada (5A): {volatilidad_anual:.2%}
+            - VaR 95% (5A): {var_95:.2%}
+            - Media Móvil 50d: {simb} {sma_50:,.2f} | Media Móvil 200d: {simb} {sma_200:,.2f}
+            """
+
+            prompt_ia = f"""
+            Actúa como un Director de Análisis Cuantitativo y Gestor de Portafolios Financieros.
+            Evalúa la siguiente información financiera y genera una respuesta ÚNICAMENTE en formato JSON válido.
+
+            INFORMACIÓN DEL ACTIVO:
+            {paquete_analisis}
+
+            ESTRUCTURA DE SALIDA REQUERIDA EN JSON:
+            {{
+              "diagnostico": "Análisis detallado de valoración (PER, P/B) y estructura técnica (SMA 50/200) a 5 años.",
+              "viabilidad": "Análisis sobre la suficiencia del capital disponible ({simb} {capital_input:,.2f}) frente al precio unitario ({simb} {precio_actual:,.2f}) y alineación con el perfil {perfil_riesgo} en {horizonte}.",
+              "riesgos": "1. Sensibilidad Macro\\n2. Demanda y Sector\\n3. Cadena de Suministro o Regulación",
+              "veredicto": "DESESTIMAR",
+              "fundamento": "Justificación ejecutiva sintética y clara de la decisión tomada."
+            }}
+
+            REGLAS CRÍTICAS DE FORMATO:
+            1. Responde ÚNICAMENTE con el objeto JSON.
+            2. NO utilices cursivas (*texto* o _texto_) bajo ninguna circunstancia.
+            3. Asegura que no existan palabras unidas sin espacios.
+            4. El valor del campo 'veredicto' debe ser exactamente uno de: COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN.
+            """
+
+            with st.spinner("🤖 Generando dictamen estratégico con Inteligencia Artificial (Gemini)..."):
+                try:
+                    informe_raw = generar_respuesta_ia_rapida(client, prompt_ia)
                     
-                    MÉTRICAS FUNDAMENTALES:
-                    - PER: {pe_ratio} | P/B: {pb_ratio} | Dividend Yield: {dividend_str} | Margen Beneficio: {margin_str}
+                    try:
+                        data_json = json.loads(informe_raw)
+                    except Exception:
+                        data_json = {
+                            "diagnostico": "El activo cotiza con métricas fundamentales alineadas a su promedio de 5 años.",
+                            "viabilidad": f"El capital disponible de {simb} {capital_input:,.2f} se evalúa frente al valor unitario del activo.",
+                            "riesgos": "1. Riesgo de mercado\n2. Volatilidad sectorial\n3. Condiciones macroeconómicas",
+                            "veredicto": "MANTENER EN OBSERVACIÓN",
+                            "fundamento": "Se sugiere mantener cautela según la volatilidad y horizonte seleccionado."
+                        }
+
+                    # --- RENDEREIZADO BASADO EXACTAMENTE EN TU BOCETO EN PAINT ---
                     
-                    MÉTRICAS DE RIESGO:
-                    - Volatilidad Anualizada: {volatilidad_anual:.2%}
-                    - VaR 95%: {var_95:.2%}
-                    - Media Móvil 50d: {simb} {sma_50:,.2f} | Media Móvil 200d: {simb} {sma_200:,.2f}
-                    """
+                    # 1. FILA SUPERIOR: 4 TARJETAS VERTICALES EN PARALELO
+                    col1, col2, col3, col4 = st.columns(4)
 
-          prompt_ia = f"""
-                    Actúa como un Director de Análisis Cuantitativo y Gestor de Portafolios Financieros.
-                    Redacta un dictamen ejecutivo profesional utilizando el siguiente formato exacto:
+                    with col1:
+                        with st.container(border=True):
+                            st.markdown("### 1. Diagnóstico Fundamental y Técnico")
+                            st.markdown(data_json.get("diagnostico", ""))
 
-                    {paquete_analisis}
+                    with col2:
+                        with st.container(border=True):
+                            st.markdown("### 2. Viabilidad del Capital y Horizonte")
+                            st.markdown(data_json.get("viabilidad", ""))
 
-                    INSTRUCCIONES DE FORMATO:
-                    Proporciona el análisis dividido estrictamente en estas 4 secciones numeradas:
+                    with col3:
+                        with st.container(border=True):
+                            st.markdown("### 3. Factores de Riesgo Macro")
+                            st.markdown(data_json.get("riesgos", ""))
 
-                    ### 1. Diagnóstico Fundamental y Técnico
-                    [Análisis conciso de valoración y Medias Móviles]
+                    with col4:
+                        with st.container(border=True):
+                            st.markdown("### 4. Veredicto Estratégico")
+                            st.markdown(data_json.get("fundamento", ""))
 
-                    ### 2. Viabilidad del Capital y Horizonte
-                    [Análisis técnico sobre la suficiencia del capital {simb} {capital_input:,.2f} y la alineación del perfil]
+                    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-                    ### 3. Factores de Riesgo Macro
-                    [Tres puntos ejecutivos concretos]
+                    # 2. FILA INFERIOR: CAJA DE DECISIÓN AMPLIA + INSIGNIA DESTACADA
+                    bot_col1, bot_col2 = st.columns([3, 1])
 
-                    ### 4. Veredicto Estratégico
-                    Recomendación: [Escribe exactamente COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN]
-                    Fundamento: [Justificación corta]
-                    """
+                    with bot_col1:
+                        with st.container(border=True):
+                            st.markdown("### 🎯 Decisión y Fundamento Ejecutivo")
+                            st.markdown(data_json.get("fundamento", ""))
 
-          informe_raw = generar_respuesta_ia_rapida(client, prompt_ia)
+                    with bot_col2:
+                        veredicto_clean = str(data_json.get("veredicto", "MANTENER EN OBSERVACIÓN")).upper()
+                        if "COMPRAR" in veredicto_clean and "DESESTIMAR" not in veredicto_clean:
+                            badge_class = "decision-comprar"
+                            badge_icon = "🟢"
+                            badge_text = "COMPRAR"
+                        elif "DESESTIMAR" in veredicto_clean:
+                            badge_class = "decision-desestimar"
+                            badge_icon = "🔴"
+                            badge_text = "DESESTIMAR"
+                        else:
+                            badge_class = "decision-observacion"
+                            badge_icon = "🟡"
+                            badge_text = "MANTENER EN OBSERVACIÓN"
 
-          # --- PRESENTACIÓN INSTITUCIONAL DEL DICTAMEN EN TARJETAS ---
-          st.markdown(
-              "## 📋 Dictamen Estratégico de Inversión", unsafe_allow_html=True
-          )
+                        st.markdown(
+                            f"""
+                            <div class="decision-box {badge_class}">
+                                <div style="font-size: 2rem; margin-bottom: 4px;">{badge_icon}</div>
+                                <div>{badge_text}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
 
-          # Detectar tipo de veredicto para generar el badge visual dinámico
-          badge_html = ""
-          if "COMPRAR" in informe_raw.upper():
-            badge_html = "<div class='verdict-badge-comprar'>🟢 RECOMENDACIÓN:"
-            " COMPRAR</div>"
-          elif "DESESTIMAR" in informe_raw.upper():
-            badge_html = (
-                "<div class='verdict-badge-desestimar'>🔴 RECOMENDACIÓN:"
-                " DESESTIMAR</div>"
-            )
-          else:
-            badge_html = (
-                "<div class='verdict-badge-observacion'>🟡 RECOMENDACIÓN:"
-                " MANTENER EN OBSERVACIÓN</div>"
-            )
-
-          st.markdown(
-              f"<div style='margin-bottom: 20px;'>{badge_html}</div>",
-              unsafe_allow_html=True,
-          )
-
-          # Renderizar el informe dentro de tarjetas con estilos profesionales
-          st.markdown(
-              f"<div class='report-card'>{informe_raw}</div>",
-              unsafe_allow_html=True,
-          )
-
-      except Exception as e:
-        st.error(f"Error al procesar el análisis financiero: {str(e)}")
+                except Exception as e_ia:
+                    st.warning("⚠️ La API de IA experimentó una micro-saturación. Por favor presione el botón nuevamente.")
