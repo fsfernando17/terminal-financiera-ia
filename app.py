@@ -226,14 +226,11 @@ def generar_respuesta_ia_robusta(client, prompt):
 # MOTOR ECONOMÉTRICO & MONTE CARLO GBM CALIBRADO
 # ==============================================================================
 def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500):
-    # Calibración estricta de la ventana según el horizonte para evitar bandas desproporcionadas
     dias_historia = 60 if dias_proy <= 60 else (120 if dias_proy <= 180 else 252)
     retornos_recientes = retornos_diarios.tail(dias_historia) if len(retornos_diarios) > dias_historia else retornos_diarios
     
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
-    
-    # Factor de escala corrector para acotar la banda estocástica en plazos cortos
     sigma_calibrado = sigma_diario * (0.85 if dias_proy <= 60 else 1.0)
     
     drift = mu_diario - 0.5 * (sigma_calibrado ** 2)
@@ -419,7 +416,7 @@ with tab_acciones:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=fechas_hist, y=precios_hist, mode="lines", name="Histórico Real (5 Años)", line=dict(color="#10b981", width=2.0)))
                     fig.add_trace(go.Scatter(x=fechas_futuras, y=p90, mode="lines", name="Escenario Optimista (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
-                    fig.add_trace(go.Scatter(x=fechas_futuras, y=p10, mode="lines", name="Escenario Pesimista (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
+                    fig.add_trace(go.Scatter(x=fechas_futuras, y=p10, mode="lines", name="Escenario Pesimista (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
                     fig.add_trace(go.Scatter(x=fechas_futuras, y=mediana, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
 
                     fig.update_layout(
@@ -477,11 +474,11 @@ with tab_acciones:
                     raw_response = generar_respuesta_ia_robusta(client, prompt_ia)
                     data_json = parse_json_respuesta(raw_response)
 
+                    es_insuf = capital_input < precio_actual
                     if not data_json:
-                        es_insuf = capital_input < precio_actual
                         data_json = {
                             "diagnostico": f"Evaluación cuantitativa del activo {ticker_final} con un PER estimado de {pe_ratio} y volatilidad anual del {volatilidad_anual:.2%}.",
-                            "viabilidad": f"Análisis de capital: {'Insuficiente' if es_insuf || False else 'Suficiente'} para adquirir 1 acción a {simb} {precio_actual:,.2f}.",
+                            "viabilidad": f"Análisis de capital: {'Insuficiente' if es_insuf else 'Suficiente'} para adquirir 1 acción a {simb} {precio_actual:,.2f}.",
                             "riesgos": "1. Riesgo de mercado y tasa de descuento.\n2. Presión inflacionaria global.\n3. Liquidez del activo.",
                             "veredicto": "DESESTIMAR" if es_insuf else "MANTENER EN OBSERVACIÓN",
                             "fundamento": f"Capital disponible de {simb} {capital_input:,.2f} frente al costo accionario unitario de {simb} {precio_actual:,.2f}."
@@ -555,7 +552,7 @@ with tab_forex:
                     fig_fx = go.Figure()
                     fig_fx.add_trace(go.Scatter(x=fechas_hist, y=df_fx["Close"], mode="lines", name="Tipo de Cambio Histórico", line=dict(color="#10b981", width=2.0)))
                     fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p90_fx, mode="lines", name="Escenario Volatilidad (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", dash="dash")))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
                     fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=mediana_fx, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
 
                     fig_fx.update_layout(
@@ -618,7 +615,7 @@ with tab_forex:
                     with col_f1: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>1. Diagnóstico Macro / Tasas</div><div class='analysis-card-body'>{data_json_fx.get('diagnostico', '')}</div></div>", unsafe_allow_html=True)
                     with col_f2: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>2. Sensibilidad y Cobertura</div><div class='analysis-card-body'>{data_json_fx.get('viabilidad', '')}</div></div>", unsafe_allow_html=True)
                     with col_f3: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>3. Riesgo Geopolítico / FED</div><div class='analysis-card-body'>{data_json_fx.get('riesgos', '').replace(chr(10), '<br>')}</div></div>", unsafe_allow_html=True)
-                    with col4: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>4. Posicionamiento Estratégico</div><div class='analysis-card-body'>{data_json_fx.get('fundamento', '')}</div></div>", unsafe_allow_html=True)
+                    with col_f4: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>4. Posicionamiento Estratégico</div><div class='analysis-card-body'>{data_json_fx.get('fundamento', '')}</div></div>", unsafe_allow_html=True)
 
                     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
 
