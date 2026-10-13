@@ -5,7 +5,7 @@ import yfinance as yf
 from google import genai
 import plotly.graph_objects as go
 
-# --- CONFIGURACIÓN DE PÁGINA Y TEMA FINTECH PROFESIONAL ---
+# --- CONFIGURACIÓN DE PÁGINA FINTECH PROFESIONAL ---
 st.set_page_config(
     page_title="Asistente Inteligente de Inversiones Bursátiles",
     page_icon="📈",
@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS Personalizados para UI/UX Fintech Premium
+# Estilos CSS Personalizados con Alta Legibilidad y Contraste
 st.markdown("""
     <style>
     /* Estilo General Dark Mode */
@@ -23,23 +23,28 @@ st.markdown("""
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Contenedores y Tarjetas */
-    .fintech-card {
-        background-color: #111827;
-        border: 1px solid #1f2937;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    /* CORRECCIÓN DE CONTRASTE: Forzar color blanco/brillante en todas las etiquetas de entrada */
+    label, [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stWidgetLabel p {
+        color: #f3f4f6 !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
     }
     
+    /* Estilo de cajas de selección e inputs */
+    div[data-baseweb="select"] > div, input {
+        background-color: #1f2937 !important;
+        color: #ffffff !important;
+        border-color: #374151 !important;
+        border-radius: 8px !important;
+    }
+
+    /* Tarjeta para Veredicto Final de IA */
     .dictamen-card {
         background-color: #111827;
         border-left: 5px solid #10b981;
-        border-top: 1px solid #1f2937;
-        border-right: 1px solid #1f2937;
-        border-bottom: 1px solid #1f2937;
-        border-radius: 8px;
+        border: 1px solid #1f2937;
+        border-left-width: 5px;
+        border-radius: 10px;
         padding: 24px;
         margin-top: 20px;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
@@ -47,7 +52,7 @@ st.markdown("""
 
     /* Títulos y Subtítulos */
     h1 {
-        color: #f9fafb !important;
+        color: #ffffff !important;
         font-weight: 800 !important;
         letter-spacing: -0.025em;
     }
@@ -58,20 +63,20 @@ st.markdown("""
     
     /* Métricas KPI */
     [data-testid="stMetric"] {
-        background-color: #1f2937;
-        border: 1px solid #374151;
+        background-color: #111827;
+        border: 1px solid #1f2937;
         border-radius: 10px;
-        padding: 12px 16px;
+        padding: 14px 18px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
     [data-testid="stMetricLabel"] {
         color: #9ca3af !important;
-        font-size: 0.85rem !important;
+        font-size: 0.88rem !important;
         font-weight: 600;
     }
     [data-testid="stMetricValue"] {
         color: #38bdf8 !important;
-        font-size: 1.4rem !important;
+        font-size: 1.45rem !important;
         font-weight: 700;
     }
 
@@ -115,7 +120,7 @@ client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 # CONEXIÓN DIRECTA A MODELOS ACTIVOS DE GOOGLE AI STUDIO
 def generar_respuesta_ia_rapida(client, prompt):
     """
-    Utiliza exactamente los modelos habilitados en la consola de Google AI Studio:
+    Utiliza estrictamente los modelos habilitados en la consola de Google AI Studio:
     gemini-3.8-flash -> gemini-3.7-flash -> gemini-3.6-flash
     """
     modelos_validos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
@@ -163,62 +168,61 @@ MERCADOS = {
     }
 }
 
-# --- ENCABEZADO DE ALTA PRESENTACIÓN ---
+# --- ENCABEZADO PRINCIPAL ---
 st.title("📈 Asistente Inteligente de Inversiones Bursátiles")
-st.markdown("<p style='color: #9ca3af; font-size: 1.05rem;'>Terminal cuantitativa, fundamental y econométrica para la evaluación estratégica de activos financieros globales.</p>", unsafe_allow_html=True)
-st.markdown("---")
+st.markdown("<p style='color: #9ca3af; font-size: 1.05rem; margin-bottom: 25px;'>Terminal cuantitativa, fundamental y econométrica para la evaluación estratégica de activos financieros globales.</p>", unsafe_allow_html=True)
 
-# --- TARJETA DE CONFIGURACIÓN Y PARÁMETROS ---
-st.markdown("<div class='fintech-card'>", unsafe_allow_html=True)
-st.subheader("⚙️ Parámetros Operativos de Inversión")
+# --- PANEL DE CONFIGURACIÓN LIMPIO (SIN BARRAS HUÉRFANAS) ---
+with st.container(border=True):
+    st.subheader("⚙️ Parámetros Operativos de Inversión")
 
-col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-with col1:
-    mercado_sel = st.selectbox("🌍 Mercado de Origen:", list(MERCADOS.keys()))
+    with col1:
+        mercado_sel = st.selectbox("🌍 Mercado de Origen:", list(MERCADOS.keys()))
 
-dic_acciones = MERCADOS[mercado_sel]
+    dic_acciones = MERCADOS[mercado_sel]
 
-with col2:
-    opcion_accion = st.selectbox(
-        "📊 Selección de Acción / Ticker:",
-        list(dic_acciones.keys()),
-        format_func=lambda x: f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}"
-    )
-    
-    if opcion_accion == "🔍 Buscar otro Ticker manualmente":
-        ticker_final = st.text_input("Ingrese Ticker oficial de Yahoo Finance (ej: AMD, MELI, PBR):", value="NVDA").upper()
-        nombre_empresa = ticker_final
-    else:
-        ticker_final = opcion_accion
-        nombre_empresa = dic_acciones[opcion_accion]
+    with col2:
+        opcion_accion = st.selectbox(
+            "📊 Selección de Acción / Ticker:",
+            list(dic_acciones.keys()),
+            format_func=lambda x: f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}"
+        )
+        
+        if opcion_accion == "🔍 Buscar otro Ticker manualmente":
+            ticker_final = st.text_input("Ingrese Ticker oficial de Yahoo Finance (ej: AMD, MELI, PBR):", value="NVDA").upper()
+            nombre_empresa = ticker_final
+        else:
+            ticker_final = opcion_accion
+            nombre_empresa = dic_acciones[opcion_accion]
 
-with col3:
-    moneda_sel = st.selectbox("💵 Moneda de Operación:", list(TASAS_CAMBIO_APROX.keys()))
+    with col3:
+        moneda_sel = st.selectbox("💵 Moneda de Operación:", list(TASAS_CAMBIO_APROX.keys()))
 
-conf_moneda = TASAS_CAMBIO_APROX[moneda_sel]
+    conf_moneda = TASAS_CAMBIO_APROX[moneda_sel]
 
-col4, col5, col6 = st.columns(3)
+    col4, col5, col6 = st.columns(3)
 
-with col4:
-    monto_min = conf_moneda["min"]
-    capital_input = st.number_input(
-        f"💰 Capital Disponible ({conf_moneda['simbolo']}):",
-        min_value=monto_min,
-        value=monto_min * 10,
-        step=monto_min
-    )
+    with col4:
+        monto_min = conf_moneda["min"]
+        capital_input = st.number_input(
+            f"💰 Capital Disponible ({conf_moneda['simbolo']}):",
+            min_value=monto_min,
+            value=monto_min * 10,
+            step=monto_min
+        )
 
-with col5:
-    horizonte = st.selectbox(
-        "⏱️ Horizonte Temporal:",
-        ["Corto Plazo (1 a 3 meses)", "Mediano Plazo (6 meses a 1 año)", "Largo Plazo (1 año a más)"]
-    )
+    with col5:
+        horizonte = st.selectbox(
+            "⏱️ Horizonte Temporal:",
+            ["Corto Plazo (1 a 3 meses)", "Mediano Plazo (6 meses a 1 año)", "Largo Plazo (1 año a más)"]
+        )
 
-with col6:
-    perfil_riesgo = st.selectbox("🛡️ Perfil del Inversor:", ["Conservador", "Moderado", "Agresivo"])
+    with col6:
+        perfil_riesgo = st.selectbox("🛡️ Perfil del Inversor:", ["Conservador", "Moderado", "Agresivo"])
 
-st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # --- BOTÓN PRINCIPAL DE EJECUCIÓN ---
 if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_container_width=True):
@@ -283,7 +287,7 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
 
                     st.markdown("---")
 
-                    # --- GRÁFICO PLOTLY DE ESTÁNDAR BURSÁTIL ---
+                    # --- GRÁFICO PLOTLY BURSÁTIL ---
                     st.markdown(f"### 📈 Comportamiento Histórico & Proyección Econométrica ({horizonte})")
                     
                     if "1 a 3 meses" in horizonte:
@@ -325,14 +329,14 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                         template="plotly_dark",
                         paper_bgcolor="#111827",
                         plot_bgcolor="#111827",
-                        height=500,
+                        height=480,
                         hovermode="x unified",
                         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(17,24,39,0.8)")
                     )
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # --- AVISO LEGAL FORMATO COMPACTO ---
+                    # --- AVISO LEGAL ---
                     st.markdown("""
                         <div class="disclaimer-box">
                             <strong>⚠️ Aviso Legal / Descargo de Responsabilidad:</strong> 
@@ -344,7 +348,7 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
 
                     st.markdown("---")
 
-                    # --- PROMPT DIRECTO PARA DICTAMEN ESTRUCTURADO ---
+                    # --- PROMPT DIRECTO Y ESTRUCTURADO PARA IA ---
                     paquete_analisis = f"""
                     Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
                     Precio Actual: {simb} {precio_actual:,.2f}
