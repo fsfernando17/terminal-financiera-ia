@@ -5,7 +5,7 @@ import yfinance as yf
 from google import genai
 import plotly.graph_objects as go
 
-# --- CONFIGURACIÓN DE PÁGINA FINTECH ---
+# --- CONFIGURACIÓN DE PÁGINA Y TEMA FINTECH PROFESIONAL ---
 st.set_page_config(
     page_title="Asistente Inteligente de Inversiones Bursátiles",
     page_icon="📈",
@@ -13,38 +13,96 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilo CSS personalizado
+# Estilos CSS Personalizados para UI/UX Fintech Premium
 st.markdown("""
     <style>
-    .main {
-        background-color: #0d1117;
+    /* Estilo General Dark Mode */
+    .stApp {
+        background-color: #0b0f17;
+        color: #e5e7eb;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-    .stAppHeader {
-        background-color: #0d1117;
+    
+    /* Contenedores y Tarjetas */
+    .fintech-card {
+        background-color: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
+    
+    .dictamen-card {
+        background-color: #111827;
+        border-left: 5px solid #10b981;
+        border-top: 1px solid #1f2937;
+        border-right: 1px solid #1f2937;
+        border-bottom: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 24px;
+        margin-top: 20px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Títulos y Subtítulos */
+    h1 {
+        color: #f9fafb !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.025em;
+    }
+    h2, h3 {
+        color: #38bdf8 !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Métricas KPI */
+    [data-testid="stMetric"] {
+        background-color: #1f2937;
+        border: 1px solid #374151;
+        border-radius: 10px;
+        padding: 12px 16px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    [data-testid="stMetricLabel"] {
+        color: #9ca3af !important;
+        font-size: 0.85rem !important;
+        font-weight: 600;
+    }
+    [data-testid="stMetricValue"] {
+        color: #38bdf8 !important;
+        font-size: 1.4rem !important;
+        font-weight: 700;
+    }
+
+    /* Botón de Ejecución Principal */
     .stButton>button {
         width: 100%;
-        background-color: #238636;
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
         color: #ffffff;
-        font-weight: 600;
-        font-size: 16px;
-        border-radius: 8px;
+        font-weight: 700;
+        font-size: 17px;
+        border-radius: 10px;
         border: none;
-        padding: 12px 24px;
-        transition: all 0.3s ease;
+        padding: 14px 28px;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+        transition: all 0.2s ease-in-out;
     }
     .stButton>button:hover {
-        background-color: #2ea043;
-        box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
+        background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
     }
+
+    /* Cajas de Aviso Legal */
     .disclaimer-box {
-        background-color: #1f1a0f;
-        border-left: 4px solid #d97706;
+        background-color: #17120a;
+        border-left: 4px solid #f59e0b;
+        border-radius: 8px;
         color: #f3f4f6;
-        padding: 14px;
-        border-radius: 6px;
-        font-size: 13px;
-        margin-top: 15px;
+        padding: 16px 20px;
+        font-size: 0.88rem;
+        margin-top: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -54,14 +112,11 @@ api_key_oculta = st.secrets.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
 
-# CONEXIÓN ULTRA RÁPIDA A LOS MODELOS VIGENTES DE GOOGLE AI STUDIO
+# CONEXIÓN DIRECTA A MODELOS ACTIVOS DE GOOGLE AI STUDIO
 def generar_respuesta_ia_rapida(client, prompt):
     """
-    Usa estrictamente los modelos activos confirmados en la consola de Google AI Studio:
-    1. gemini-3.8-flash (Principal)
-    2. gemini-3.7-flash (Reserva 1)
-    3. gemini-3.6-flash (Reserva 2)
-    Sin retardos artificiales para garantizar la máxima velocidad de ejecución.
+    Utiliza exactamente los modelos habilitados en la consola de Google AI Studio:
+    gemini-3.8-flash -> gemini-3.7-flash -> gemini-3.6-flash
     """
     modelos_validos = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
     
@@ -74,10 +129,9 @@ def generar_respuesta_ia_rapida(client, prompt):
             if response and response.text:
                 return response.text
         except Exception:
-            # Si un modelo no responde o tiene un pico, conmuta en milisegundos al siguiente
             continue
             
-    raise Exception("No se pudo obtener respuesta de la API de Gemini. Verifique la API Key en los secretos de Streamlit.")
+    raise Exception("No se pudo obtener respuesta de la API de Gemini. Verifique la clave GEMINI_API_KEY en los secretos.")
 
 
 # --- DICCIONARIOS MULTIMONEDA Y MERCADOS ---
@@ -109,13 +163,14 @@ MERCADOS = {
     }
 }
 
-# --- ENCABEZADO PRINCIPAL ---
+# --- ENCABEZADO DE ALTA PRESENTACIÓN ---
 st.title("📈 Asistente Inteligente de Inversiones Bursátiles")
-st.markdown("Plataforma cuantitativa, fundamental y predictiva para el análisis estratégico de activos en mercados internacionales.")
+st.markdown("<p style='color: #9ca3af; font-size: 1.05rem;'>Terminal cuantitativa, fundamental y econométrica para la evaluación estratégica de activos financieros globales.</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# --- PANEL DE CONFIGURACIÓN ---
-st.subheader("⚙️ Parámetros del Análisis")
+# --- TARJETA DE CONFIGURACIÓN Y PARÁMETROS ---
+st.markdown("<div class='fintech-card'>", unsafe_allow_html=True)
+st.subheader("⚙️ Parámetros Operativos de Inversión")
 
 col1, col2, col3 = st.columns(3)
 
@@ -126,13 +181,13 @@ dic_acciones = MERCADOS[mercado_sel]
 
 with col2:
     opcion_accion = st.selectbox(
-        "📊 Selección de Acción:",
+        "📊 Selección de Acción / Ticker:",
         list(dic_acciones.keys()),
-        format_func=lambda x: f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir código'}"
+        format_func=lambda x: f"{x} - {dic_acciones[x] if x != '🔍 Buscar otro Ticker manualmente' else 'Escribir Ticker'}"
     )
     
     if opcion_accion == "🔍 Buscar otro Ticker manualmente":
-        ticker_final = st.text_input("Ingrese Ticker de Yahoo Finance (ej: AMD, MELI, PBR):", value="NVDA").upper()
+        ticker_final = st.text_input("Ingrese Ticker oficial de Yahoo Finance (ej: AMD, MELI, PBR):", value="NVDA").upper()
         nombre_empresa = ticker_final
     else:
         ticker_final = opcion_accion
@@ -148,7 +203,7 @@ col4, col5, col6 = st.columns(3)
 with col4:
     monto_min = conf_moneda["min"]
     capital_input = st.number_input(
-        f"💰 Capital a Invertir ({conf_moneda['simbolo']}):",
+        f"💰 Capital Disponible ({conf_moneda['simbolo']}):",
         min_value=monto_min,
         value=monto_min * 10,
         step=monto_min
@@ -163,32 +218,32 @@ with col5:
 with col6:
     perfil_riesgo = st.selectbox("🛡️ Perfil del Inversor:", ["Conservador", "Moderado", "Agresivo"])
 
-st.markdown("---")
+st.markdown("</div>", unsafe_allow_html=True)
 
-# --- EJECUCIÓN DEL ANÁLISIS ---
+# --- BOTÓN PRINCIPAL DE EJECUCIÓN ---
 if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_container_width=True):
     if not api_key_oculta or not client:
-        st.error("⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta GEMINI_API_KEY en Secrets).")
+        st.error("⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta la clave GEMINI_API_KEY en Secrets).")
     else:
-        with st.spinner(f"Procesando métricas financieras y conectando con IA para {ticker_final}..."):
+        with st.spinner(f"Procesando métricas cuantitativas, econométricas y de riesgo para {ticker_final}..."):
             try:
-                # Descarga de datos bursátiles
+                # Descarga de datos
                 stock = yf.Ticker(ticker_final)
                 df = stock.history(period="1y")
                 info = stock.info
                 
                 if df.empty:
-                    st.error(f"⚠️ No se encontraron datos para el símbolo '{ticker_final}'. Verifique que el ticker sea válido en Yahoo Finance.")
+                    st.error(f"⚠️ No se encontraron registros financieros para el símbolo '{ticker_final}'. Verifique el ticker en Yahoo Finance.")
                 else:
                     tasa = conf_moneda["factor"]
                     simb = conf_moneda["simbolo"]
                     
-                    # Ajuste de precios a la divisa seleccionada
+                    # Precios convertidos a la divisa seleccionada
                     precio_actual_raw = df['Close'].iloc[-1]
                     precio_actual = precio_actual_raw * tasa
                     df['Close_Moneda'] = df['Close'] * tasa
                     
-                    # Métricas Fundamentales formateadas
+                    # Fundamental Data
                     market_cap = info.get('marketCap', 0) * tasa if info.get('marketCap') else 0
                     pe_ratio_raw = info.get('trailingPE', 'N/A')
                     pe_ratio = f"{pe_ratio_raw:.2f}" if isinstance(pe_ratio_raw, (int, float)) else str(pe_ratio_raw)
@@ -202,7 +257,7 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                     margin_str = f"{profit_margin*100:.2f}%" if profit_margin else "N/A"
                     sector = info.get('sector', 'General / No especificado')
                     
-                    # Métricas Cuantitativas y Estadísticas
+                    # Econometric & Quantitative Calculations
                     df['Retorno_Diario'] = df['Close'].pct_change()
                     volatilidad_anual = df['Retorno_Diario'].std() * np.sqrt(252)
                     retorno_medio_diario = df['Retorno_Diario'].mean()
@@ -211,25 +266,25 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                     sma_50 = df['Close_Moneda'].rolling(window=50).mean().iloc[-1]
                     sma_200 = df['Close_Moneda'].rolling(window=200).mean().iloc[-1] if len(df) >= 200 else sma_50
                     
-                    # PANEL DE MÉTRICAS VISUALES
-                    st.markdown("### 📊 Indicadores Clave de Rendimiento y Fundamentos")
+                    # --- PANEL EJECUTIVO DE INDICADORES (KPIS) ---
+                    st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos")
                     
                     c_m1, c_m2, c_m3, c_m4 = st.columns(4)
                     c_m1.metric(f"Precio Actual ({simb})", f"{simb} {precio_actual:,.2f}")
                     c_m2.metric("PER (Price / Earnings)", f"{pe_ratio}")
                     c_m3.metric("Volatilidad Anualizada", f"{volatilidad_anual:.2%}")
-                    c_m4.metric("Margen de Beneficio", f"{margin_str}")
+                    c_m4.metric("Margen Beneficio Neto", f"{margin_str}")
                     
                     c_m5, c_m6, c_m7, c_m8 = st.columns(4)
                     c_m5.metric(f"Cap. de Mercado ({simb})", f"{simb} {market_cap:,.0f}" if market_cap else "N/A")
                     c_m6.metric("Ratio P/B", f"{pb_ratio}")
-                    c_m7.metric("Rendimiento por Dividendo", f"{dividend_str}")
+                    c_m7.metric("Rendimiento Dividendo", f"{dividend_str}")
                     c_m8.metric("VaR 95% (Pérdida Máx. Diaria)", f"{var_95:.2%}")
 
                     st.markdown("---")
 
-                    # GRÁFICO INTERACTIVO PLOTLY
-                    st.markdown(f"### 📈 Comportamiento Histórico y Proyección a {horizonte}")
+                    # --- GRÁFICO PLOTLY DE ESTÁNDAR BURSÁTIL ---
+                    st.markdown(f"### 📈 Comportamiento Histórico & Proyección Econométrica ({horizonte})")
                     
                     if "1 a 3 meses" in horizonte:
                         dias_proy = 60
@@ -238,7 +293,7 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                     else:
                         dias_proy = 365
 
-                    # Simulación econométrica estocástica
+                    # Simulación Estocástica
                     np.random.seed(42)
                     cambios_simulados = np.random.normal(retorno_medio_diario, df['Retorno_Diario'].std(), dias_proy)
                     precios_futuros = [precio_actual]
@@ -253,29 +308,31 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
 
                     fig.add_trace(go.Scatter(
                         x=fechas_hist, y=precios_hist,
-                        mode='lines', name='Histórico Reciente',
-                        line=dict(color='#29b6f6', width=2)
+                        mode='lines', name='Histórico Reciente (Real)',
+                        line=dict(color='#00e676', width=2.5)
                     ))
 
                     fig.add_trace(go.Scatter(
                         x=fechas_futuras, y=precios_futuros,
                         mode='lines', name='Proyección Econométrica',
-                        line=dict(color='#ab47bc', width=2, dash='dash')
+                        line=dict(color='#e040fb', width=2.5, dash='dash')
                     ))
 
                     fig.update_layout(
-                        title=f"Evolución del Precio y Pronóstico Estimado - {ticker_final}",
-                        xaxis_title="Fecha / Periodo de Proyección",
-                        yaxis_title=f"Precio del Activo ({simb})",
+                        title=dict(text=f"Trayectoria de Cotización Estimada - {ticker_final}", font=dict(size=16, color='#f9fafb')),
+                        xaxis=dict(title="Fecha / Periodo de Proyección", gridcolor='#1f2937'),
+                        yaxis=dict(title=f"Precio del Activo ({simb})", gridcolor='#1f2937'),
                         template="plotly_dark",
-                        height=480,
+                        paper_bgcolor="#111827",
+                        plot_bgcolor="#111827",
+                        height=500,
                         hovermode="x unified",
-                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(17,24,39,0.8)")
                     )
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # DISCLAIMER LEGAL
+                    # --- AVISO LEGAL FORMATO COMPACTO ---
                     st.markdown("""
                         <div class="disclaimer-box">
                             <strong>⚠️ Aviso Legal / Descargo de Responsabilidad:</strong> 
@@ -287,46 +344,52 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
 
                     st.markdown("---")
 
-                    # PROMPT EJECUTIVO Y DIRECTO PARA VELOCIDAD DE GENERACIÓN
+                    # --- PROMPT DIRECTO PARA DICTAMEN ESTRUCTURADO ---
                     paquete_analisis = f"""
                     Activo: {ticker_final} ({nombre_empresa}) | Sector: {sector}
                     Precio Actual: {simb} {precio_actual:,.2f}
-                    Capital disponible del inversor: {simb} {capital_input:,.2f}
-                    Moneda seleccionada: {moneda_sel}
-                    Horizonte Temporal: {horizonte}
-                    Perfil de Riesgo: {perfil_riesgo}
+                    Capital disponible: {simb} {capital_input:,.2f}
+                    Moneda: {moneda_sel} | Horizonte: {horizonte} | Perfil: {perfil_riesgo}
                     
-                    MÉTRICAS FUNDAMENTALES:
-                    - Ratio P/E (PER): {pe_ratio}
-                    - Ratio P/B: {pb_ratio}
-                    - Dividend Yield: {dividend_str}
-                    - Margen de Beneficio Neto: {margin_str}
+                    FUNDAMENTALES:
+                    - Ratio P/E (PER): {pe_ratio} | Ratio P/B: {pb_ratio}
+                    - Dividend Yield: {dividend_str} | Margen Beneficio: {margin_str}
                     
-                    MÉTRICAS TÉCNICAS Y ESTADÍSTICAS:
+                    CUANTITATIVOS & RIESGO:
                     - Volatilidad Anualizada: {volatilidad_anual:.2%}
-                    - Value at Risk (VaR 95% diario): {var_95:.2%}
-                    - Media Móvil (50 ruedas): {simb} {sma_50:,.2f}
-                    - Media Móvil (200 ruedas): {simb} {sma_200:,.2f}
+                    - Value at Risk (VaR 95%): {var_95:.2%}
+                    - Media Móvil 50d: {simb} {sma_50:,.2f} | Media Móvil 200d: {simb} {sma_200:,.2f}
                     """
 
                     prompt_ia = f"""
-                    Actúa como un Asesor Financiero Senior y Analista de Inversiones Bursátiles.
-                    Proporciona un dictamen sintético, directo y profesional estructurado así:
+                    Actúa como un Director de Análisis Cuantitativo y Gestor de Inversiones Senior.
+                    Proporciona un informe estratégico bien formateado con las siguientes secciones en Markdown:
 
                     {paquete_analisis}
 
-                    PUNTOS A RESPONDER (Breve y al grano):
-                    1. **Diagnóstico Fundamental y Técnico:** Evalúa la valoración (PER, P/B, Medias Móviles).
-                    2. **Análisis de Capital:** Opina si el capital de {simb} {capital_input:,.2f} es óptimo para el horizonte de {horizonte}.
-                    3. **Riesgos Macro:** Riesgos clave a vigilar.
-                    4. **Veredicto:** Recomendación estratégica concreta.
+                    ESTRUCTURA OBLIGATORIA:
+                    ### 1. Diagnóstico Fundamental y Técnico
+                    (Breve evaluación de la valoración y posición de medias móviles).
+
+                    ### 2. Viabilidad del Capital y Horizonte
+                    (Analiza si el capital de {simb} {capital_input:,.2f} es suficiente y adecuado para la estrategia en {horizonte}).
+
+                    ### 3. Factores de Riesgo Macro
+                    (Tres puntos clave a vigilar).
+
+                    ### 4. Veredicto Estratégico
+                    - **Recomendación:** [COMPRAR / DESESTIMAR / MANTENER EN OBSERVACIÓN]
+                    - **Fundamento:** Breve justificación ejecutiva.
                     """
 
-                    # Generación ultra rápida usando exclusivamente la lista oficial de tu consola
+                    # Generación inmediata
                     informe_ia = generar_respuesta_ia_rapida(client, prompt_ia)
 
-                    st.markdown("### 📋 Dictamen Estratégico del Asistente")
+                    # --- TARJETA VISUAL PARA EL DICTAMEN FINAL ---
+                    st.markdown("<div class='dictamen-card'>", unsafe_allow_html=True)
+                    st.markdown("## 📋 Dictamen Estratégico del Asistente")
                     st.markdown(informe_ia)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
             except Exception as e:
-                st.error(f"Error al procesar el análisis: {str(e)}")
+                st.error(f"Error al procesar el análisis financiero: {str(e)}")
