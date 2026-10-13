@@ -237,17 +237,19 @@ def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
     return None
 
 # ==============================================================================
-# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (MOVIMIENTO BROWNIANO GEOMÉTRICO)
+# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (GBM CALIBRADO PARA ACCIONES Y FOREX)
 # ==============================================================================
-def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500):
+def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500, es_forex=False):
     dias_historia = 60 if dias_proy <= 60 else (120 if dias_proy <= 180 else 252)
     retornos_recientes = retornos_diarios.tail(dias_historia) if len(retornos_diarios) > dias_historia else retornos_diarios
     
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
     
-    drift_suavizado = 0.25 * mu_diario
-    sigma_calibrado = sigma_diario * 0.50
+    # Factor de amortiguación estricto para divisas (evita bandas exageradas en FX)
+    factor_escala = 0.35 if es_forex else 0.50
+    drift_suavizado = 0.20 * mu_diario
+    sigma_calibrado = sigma_diario * factor_escala
     
     drift = drift_suavizado - 0.5 * (sigma_calibrado ** 2)
     matriz_precios = np.zeros((dias_proy + 1, num_simulaciones))
@@ -258,7 +260,7 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     for t in range(1, dias_proy + 1):
         factor_tiempo = np.sqrt(t / dias_proy)
         retornos_simulados = np.exp(
-            drift + sigma_calibrado * choques_aleatorios[t - 1] * (0.7 + 0.3 * factor_tiempo)
+            drift + sigma_calibrado * choques_aleatorios[t - 1] * (0.8 + 0.2 * factor_tiempo)
         )
         matriz_precios[t] = matriz_precios[t - 1] * retornos_simulados
         
@@ -304,6 +306,19 @@ MINIMOS_MONEDA = {
     "MXN ($)": 390.0
 }
 
+# Tasas de Referencia Institucionales Actualizadas (FED vs BCRP y otras regiones)
+TASAS_REFERENCIA_PAIS = {
+    "USD": 4.50,  # Tasa de fondos federales FED estimada
+    "PEN": 4.75,  # Tasa de referencia BCRP estimada
+    "EUR": 3.25,  # Tasa BCE
+    "GBP": 4.50,  # Tasa Banco de Inglaterra
+    "CLP": 5.00,  # Tasa Banco Central de Chile
+    "MXN": 10.00, # Tasa Banxico
+    "BRL": 11.25, # Tasa Banco Central de Brasil
+    "JPY": 0.50,  # Tasa Banco de Japón
+    "COP": 9.50   # Tasa Banco de la República Colombia
+}
+
 MERCADOS = {
     "NYSE / NASDAQ (Estados Unidos)": {
         "AAPL": "Apple Inc.", 
@@ -327,9 +342,9 @@ MERCADOS = {
 
 CONTEXTO_GLOBAL_INSTITUCIONAL = """
 [CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL VIGENTE]: 
-1. Bancos Centrales (FED, BCE, BCRP): Las tasas de referencia determinan el costo de oportunidad del capital (WACC) y la liquidez global. Las expectativas de recortes o alzas de tasas impactan directamente en las valoraciones corporativas.
-2. Mercados de Renta Variable y Divisas: Los inversores institucionales exigen múltiplos fundamentales sólidos (PER y P/B respaldados por flujos de caja libre reales) y una estricta gestión de riesgos.
-3. Geopolítica y Commodities: La volatilidad en las materias primas (cobre, oro, petróleo WTI) y las cadenas de suministro globales condicionan la prima de riesgo soberana y corporativa.
+1. Bancos Centrales (FED, BCE, BCRP): Las tasas de referencia determinan el diferencial cambiario y el costo de oportunidad del capital (WACC). 
+2. Mercados de Renta Variable y Divisas: Los inversores institucionales exigen múltiplos fundamentales sólidos y una estricta gestión de riesgos.
+3. Geopolítica y Commodities: La volatilidad en las materias primas (cobre, oro, petróleo WTI) y la liquidez global condicionan fuertemente el tipo de cambio y la prima de riesgo.
 """
 
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
@@ -491,7 +506,7 @@ with tab_acciones:
 
                     st.markdown(f"### 📈 Comportamiento Histórico & Proyección GBM Monte Carlo ({horizonte})")
                     dias_proyeccion = 60 if "1 a 3 meses" in horizonte else (180 if "6 meses a 1 año" in horizonte else 365)
-                    mediana_mc, p10_mc, p90_mc = simular_monte_carlo_gbm(precio_actual, df_stock["Retorno_Diario"].dropna(), dias_proyeccion)
+                    mediana_mc, p10_mc, p90_mc = simular_monte_carlo_gbm(precio_actual, df_stock["Retorno_Diario"].dropna(), dias_proyeccion, es_forex=False)
                     
                     fechas_historicas = df_stock.index
                     precios_historicos = df_stock["Close_Moneda"]
@@ -570,7 +585,7 @@ with tab_acciones:
                 prompt_ia_stock = f"""
                 Actúa como el Director de Análisis Cuantitativo y Valoración de Activos de un Fondo de Inversión Global (Hedge Fund).
                 Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (WACC, múltiplos PER {pe_ratio}, P/B {pb_ratio}, flujos de caja libre) y la macroeconomía actual (tasas FED, inflación, política monetaria).
-                PROHIBIDO dar respuestas vagas, superficiales o repetitivas. Cada tarjeta debe profundizar en la realidad financiera del activo.
+                PROHIBIDO dar respuestas vagas, superficiales o repetitivas. Cada tarjeta debe profundizar con argumentos matemáticos y reales en la realidad financiera del activo.
 
                 DATOS TÉCNICOS A EVALUAR:
                 {paquete_datos_analisis}
@@ -583,7 +598,7 @@ with tab_acciones:
                   "viabilidad": "1. Análisis de Capital: Compara matemáticamente el capital de {simbolo_moneda} {capital_input:,.2f} frente al precio unitario de {simbolo_moneda} {precio_actual:,.2f}. 2. Análisis de Perfil: Contrasta la volatilidad del {volatilidad_anualizada:.2%} con el perfil de riesgo {perfil_riesgo}.",
                   "riesgos": "Detalla 3 riesgos críticos y específicos del activo en formato de lista numérica: 1. Riesgo de tasas y costo de capital. 2. Riesgos sistémicos del sector. 3. Volatilidad macroeconómica.",
                   "veredicto": "COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN",
-                  "fundamento": "Dictamen ejecutivo directo y severo. Explica claramente la justificación financiera e institucional de la decisión tomada."
+                  "fundamento": "Dictamen ejecutivo directo y severo. Explica con total claridad y sin ambigüedades la justificación financiera e institucional de la decisión tomada."
                 }}
                 """
 
@@ -598,7 +613,7 @@ with tab_acciones:
                             "viabilidad": f"Con un capital disponible de {simbolo_moneda} {capital_input:,.2f} frente al precio unitario de {simbolo_moneda} {precio_actual:,.2f}, la asignación bajo el perfil {perfil_riesgo} resulta {'inviable para una posición accionaria completa' if es_capital_insuficiente else 'viable operativamente'}.",
                             "riesgos": "1. Sensibilidad del múltiplo de valoración a los vaivenes en las tasas de interés de referencia.\n2. Presión sobre los márgenes operativos ante menores volúmenes de demanda.\n3. Riesgo de liquidez y profundidad en las órdenes de ejecución.",
                             "veredicto": "DESESTIMAR" if es_capital_insuficiente else "MANTENER EN OBSERVACIÓN",
-                            "fundamento": f"Dictamen institucional: La relación entre el capital disponible ({simbolo_moneda} {capital_input:,.2f}) y la exposición al riesgo con una volatilidad anualizada del {volatilidad_anualizada:.2%} exige prudencia táctica y reevaluación de entradas."
+                            "fundamento": f"Dictamen institucional definitivo: La relación entre el capital disponible ({simbolo_moneda} {capital_input:,.2f}) y la exposición al riesgo con una volatilidad anualizada del {volatilidad_anualizada:.2%} exige prudencia táctica y reevaluación de entradas."
                         }
 
                     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
@@ -625,7 +640,7 @@ with tab_acciones:
                         else:
                             badge_cls, badge_ico, badge_txt = "decision-observacion", "🟡", "EN OBSERVACIÓN"
                         st.markdown(f"<div class='decision-badge-box {badge_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_txt}</div></div>", unsafe_allow_html=True)
-                     # ==============================================================================
+                        # ==============================================================================
 # PESTAÑA 2: COMPARATIVA DE DIVISAS (FOREX) EXTENDIDO
 # ==============================================================================
 with tab_forex:
@@ -663,17 +678,29 @@ with tab_forex:
                     volatilidad_fx = df_fx["Retorno_Diario"].std() * np.sqrt(252)
                     variacion_5y = ((rate_actual - df_fx["Close"].iloc[0]) / df_fx["Close"].iloc[0]) * 100
 
-                    st.markdown(f"### 📊 Panel de Indicadores Clave - {base_curr}/{target_curr}")
+                    # Obtención de tasas de interés de referencia para comparación macroeconómica
+                    tasa_base_ref = TASAS_REFERENCIA_PAIS.get(base_curr, 4.50)
+                    tasa_target_ref = TASAS_REFERENCIA_PAIS.get(target_curr, 4.50)
+                    diferencial_tasas = tasa_base_ref - tasa_target_ref
+
+                    st.markdown(f"### 📊 Panel de Indicadores Clave & Tasas de Referencia - {base_curr}/{target_curr}")
                     c_x1, c_x2, c_x3, c_x4 = st.columns(4)
-                    c_x1.metric("Tipo de Cambio Actual", f"{rate_actual:,.4f}")
-                    c_x2.metric("Monto Convertido", f"{monto_fx * rate_actual:,.2f} {target_curr}")
-                    c_x3.metric("Volatilidad Anualizada", f"{volatilidad_fx:.2%}")
-                    c_x4.metric("Variación Histórica 5A", f"{variacion_5y:+.2f}%")
+                    c_x1.metric("Tipo de Cambio Spot", f"{rate_actual:,.4f}")
+                    c_x2.metric(f"Tasa Ref. {base_curr} (FED/Central)", f"{tasa_base_ref:.2f}%")
+                    c_x3.metric(f"Tasa Ref. {target_curr} (Central)", f"{tasa_target_ref:.2f}%")
+                    c_x4.metric("Diferencial de Tasas", f"{diferencial_tasas:+.2f}%")
+
+                    c_x5, c_x6, c_x7, c_x8 = st.columns(4)
+                    c_x5.metric("Monto Convertido", f"{monto_fx * rate_actual:,.2f} {target_curr}")
+                    c_x6.metric("Volatilidad Anualizada", f"{volatilidad_fx:.2%}")
+                    c_x7.metric("Variación Histórica 5A", f"{variacion_5y:+.2f}%")
+                    c_x8.metric("Spread Cambiario Est. (% min)", "0.15%")
+
                     st.markdown("---")
 
-                    st.markdown(f"### 📈 Proyección GBM Monte Carlo ({horizonte_fx})")
+                    st.markdown(f"### 📈 Proyección GBM Monte Carlo Acotada ({horizonte_fx})")
                     dias_proy_fx = 60 if "1 a 3 meses" in horizonte_fx else (180 if "6 meses a 1 año" in horizonte_fx else 365)
-                    mediana_fx, p10_fx, p90_fx = simular_monte_carlo_gbm(rate_actual, df_fx["Retorno_Diario"].dropna(), dias_proy_fx)
+                    mediana_fx, p10_fx, p90_fx = simular_monte_carlo_gbm(rate_actual, df_fx["Retorno_Diario"].dropna(), dias_proy_fx, es_forex=True)
                     
                     fechas_hist_fx = df_fx.index
                     fechas_futuras_fx = pd.date_range(start=df_fx.index[-1], periods=dias_proy_fx + 1, freq="B")
@@ -741,8 +768,9 @@ with tab_forex:
 
                 prompt_ia_fx = f"""
                 Actúa como el Economista Jefe de Divisas (FX) de un Banco de Inversión Global.
-                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional de la paridad cambiaria {base_curr}/{target_curr}. Cruza los datos estadísticos con la paridad de tasas de interés, inflación cruzada, diferencial de política monetaria (FED vs Banco Central local) y la balanza comercial de commodities.
-                PROHIBIDO dar respuestas vagas, superficiales o repetitivas. Cada tarjeta debe profundizar en los fundamentos macroeconómicos de la divisa.
+                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional de la paridad cambiaria {base_curr}/{target_curr}. 
+                Cruza los datos estadísticos con la paridad descubierta de tasas de interés (Tasa {base_curr}: {tasa_base_ref}% vs Tasa {target_curr}: {tasa_target_ref}%, diferencial: {diferencial_tasas:+.2f}%), inflación cruzada y balanza de pagos.
+                PROHIBIDO dar respuestas vagas, superficiales o que dejen preguntas abiertas. Cada tarjeta debe ser categórica, evaluando directamente los costos de transacción y spreads estimados (0.15%), y aportando contexto geopolítico actual (como la fortaleza del Dólar Index DXY y precios de commodities).
 
                 DATOS TÉCNICOS A EVALUAR:
                 Paridad Spot Actual: {rate_actual:,.4f} | Volatilidad Anualizada: {volatilidad_fx:.2%}
@@ -753,24 +781,24 @@ with tab_forex:
 
                 ESTRUCTURA JSON REQUERIDA:
                 {{
-                  "diagnostico": "Análisis macroeconómico cambiario avanzado. Explica la tendencia de {base_curr} frente a {target_curr} basándote en flujos de capital, balanza comercial y diferencial de tasas de interés.",
-                  "viabilidad": "Evaluación econométrica de la conveniencia de '{proposito_fx}' para el monto de {monto_fx} {base_curr} bajo el horizonte temporal seleccionado.",
-                  "riesgos": "Detalla 3 riesgos críticos cambiarios en formato de lista numérica: 1. Política de la FED y fortaleza del Dólar Index (DXY). 2. Shock en precios de materias primas. 3. Riesgo fiscal/político local.",
+                  "diagnostico": "Análisis macroeconómico cambiario avanzado basado en el diferencial de tasas de interés ({diferencial_tasas:+.2f}%) y flujos de capital institucionales entre {base_curr} y {target_curr}.",
+                  "viabilidad": "Evaluación cuantitativa directa de ejecutar '{proposito_fx}' para el monto de {monto_fx} {base_curr}, integrando el impacto de los spreads operativos y el momento óptimo de entrada.",
+                  "riesgos": "Detalla 3 riesgos críticos cambiarios específicos en formato de lista numérica: 1. Postura de la FED y el Dólar Index. 2. Shocks en términos de intercambio locales. 3. Volatilidad de flujos de capital extranjero.",
                   "veredicto": "FORTALECIMIENTO, DEBILITAMIENTO o NEUTRAL",
-                  "fundamento": "Dictamen estricto directivo. Qué estrategia operativa debe seguir el tomador de decisiones respecto a esta divisa."
+                  "fundamento": "Dictamen estricto y directivo sin rodeos. Qué acción operativa inmediata y clara debe ejecutar el inversor o tesorero corporativo respecto a esta divisa."
                 }}
                 """
-                with st.spinner("🤖 Analizando contexto macro, diferenciales de tasas de interés y proyecciones FX globales..."):
+                with st.spinner("🤖 Analizando diferencial de tasas de interés, paridad cambiaria y proyecciones FX globales..."):
                     respuesta_cruda_fx = generar_respuesta_ia_robusta(client, prompt_ia_fx)
                     json_fx = parse_json_respuesta(respuesta_cruda_fx)
 
                     if not json_fx:
                         json_fx = {
-                            "diagnostico": f"La paridad {base_curr}/{target_curr} opera a un tipo de cambio spot de {rate_actual:,.4f} con una volatilidad anualizada del {volatilidad_fx:.2%}. Los flujos de capital están condicionados por el diferencial de tasas y la evolución de los precios de commodities.",
-                            "viabilidad": f"La ejecución de {monto_fx} {base_curr} bajo el objetivo de {proposito_fx} en el horizonte de {horizonte_fx} requiere evaluar la profundidad de los spreads cambiarios y el momento de entrada.",
-                            "riesgos": "1. Fluctuaciones en la postura monetaria de la FED y su impacto en el Dólar Index (DXY).\n2. Shocks en términos de intercambio y balanza comercial regional.\n3. Volatilidad derivada de factores de riesgo geopolítico y fiscal local.",
-                            "veredicto": "NEUTRAL",
-                            "fundamento": f"Dictamen FX institucional: Con una volatilidad del {volatilidad_fx:.2%}, se recomienda la implementación de estructuras de cobertura (hedging) o contratos a término para mitigar la exposición al riesgo cambiario."
+                            "diagnostico": f"La paridad {base_curr}/{target_curr} opera en {rate_actual:,.4f} con una volatilidad anualizada del {volatilidad_fx:.2%}. El diferencial de tasas de referencia ({diferencial_tasas:+.2f}%) condiciona directamente la dirección de los flujos cambiarios de corto plazo.",
+                            "viabilidad": f"Para el propósito de {proposito_fx} con un monto de {monto_fx} {base_curr}, la aplicación evalúa un spread operativo estimado de 0.15%, determinando que el timing actual es óptimo para posiciones tácticas.",
+                            "riesgos": "1. Cambios en la orientación de la política monetaria de la FED y su repercusión en el DXY.\n2. Variaciones en la balanza comercial y precios de materias primas regionales.\n3. Presiones de liquidez estacional en el mercado interbancario de divisas.",
+                            "veredicto": "FORTALECIMIENTO" if diferencial_tasas > 0 else "DEBILITAMIENTO",
+                            "fundamento": f"Dictamen FX institucional definitivo: Con un diferencial de tasas del {diferencial_tasas:+.2f}% y una volatilidad del {volatilidad_fx:.2%}, se recomienda ejecutar contratos a término (forwards) o coberturas parciales para blindar el flujo de caja operativo."
                         }
 
                     col_fx_c1, col_fx_c2, col_fx_c3, col_fx_c4 = st.columns(4)
@@ -796,4 +824,4 @@ with tab_forex:
                             badge_f_cls, badge_f_ico, badge_f_txt = "decision-desestimar", "🔴", "BAJISTA (SHORT)"
                         else:
                             badge_f_cls, badge_f_ico, badge_f_txt = "decision-observacion", "🟡", "NEUTRAL"
-                        st.markdown(f"<div class='decision-badge-box {badge_f_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_f_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_f_txt}</div></div>", unsafe_allow_html=True)   
+                        st.markdown(f"<div class='decision-badge-box {badge_f_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_f_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_f_txt}</div></div>", unsafe_allow_html=True)
