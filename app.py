@@ -4,10 +4,9 @@ import numpy as np
 import yfinance as yf
 from google import genai
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import time
 
-# --- CONFIGURACIÓN DE PÁGINA Y TEMA PROFESIONAL ---
+# --- CONFIGURACIÓN DE PÁGINA Y TEMA PROFESIONAL FINTECH ---
 st.set_page_config(
     page_title="Asistente Inteligente de Inversiones Bursátiles",
     page_icon="📈",
@@ -15,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilo CSS personalizado de nivel Fintech
+# Estilo CSS personalizado de nivel profesional
 st.markdown("""
     <style>
     .main {
@@ -23,13 +22,6 @@ st.markdown("""
     }
     .stAppHeader {
         background-color: #0d1117;
-    }
-    .metric-container {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 15px;
-        text-align: center;
     }
     .stButton>button {
         width: 100%;
@@ -62,13 +54,15 @@ st.markdown("""
 api_key_oculta = st.secrets.get("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key_oculta) if api_key_oculta else None
 
-# TÁCTICA ANTI-SATURACIÓN: Reintentos automáticos con fallback de modelo
+# ALGORITMO ANTI-SATURACIÓN Y ANTI-DESCONTINUACIÓN BLINDADO
 def generar_respuesta_ia_robusta(client, prompt):
     """
-    Intenta consultar a la IA manejando errores 503 (Servidor saturado)
-    mediante reintentos paulatinos y cambio de modelo alternativo.
+    Gestiona las consultas a la IA con conmutación automática de modelos (fallback)
+    y reintentos exponenciales ante saturación (503), cuota (429) o modelo 404.
     """
-    modelos_disponibles = ["gemini-2.5-flash", "gemini-1.5-flash"]
+    # Lista de modelos oficiales en orden de prioridad
+    modelos_disponibles = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"]
+    ultimo_error = None
     
     for modelo in modelos_disponibles:
         for intento in range(3):
@@ -79,15 +73,21 @@ def generar_respuesta_ia_robusta(client, prompt):
                 )
                 return response.text
             except Exception as e:
+                ultimo_error = e
                 err_str = str(e)
-                # Si el error es por alta demanda (503 / UNAVAILABLE / 429), reintentamos
-                if "503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str:
-                    time.sleep(2 * (intento + 1))  # Espera 2s, 4s, 6s...
+                
+                # Si el modelo no existe o fue cambiado (404), pasa de inmediato al siguiente modelo
+                if "404" in err_str or "NOT_FOUND" in err_str:
+                    break
+                # Si el servidor está saturado (503 / 429 / UNAVAILABLE), hace reintentos paulatinos
+                elif "503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    time.sleep(2 * (intento + 1)) # Espera 2s, 4s, 6s...
                 else:
-                    raise e
-    raise Exception("Los servidores del motor de IA están experimentando alta demanda. Por favor, reintente en unos segundos.")
+                    break
+                    
+    raise Exception(f"No se pudo conectar con el servicio de IA. Detalle: {str(ultimo_error)}")
 
-# --- DICCIONARIOS DE DIVERSIFICACIÓN Y MONEDAS ---
+# --- TASAS Y MERCADOS ---
 TASAS_CAMBIO_APROX = {
     "USD ($)": {"factor": 1.0, "simbolo": "$", "min": 20.0},
     "PEN (S/.)": {"factor": 3.75, "simbolo": "S/.", "min": 75.0},
@@ -163,11 +163,11 @@ st.markdown("---")
 # --- EJECUCIÓN DEL ANÁLISIS ---
 if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_container_width=True):
     if not api_key_oculta or not client:
-        st.error("⚠️ El servicio de Inteligencia Artificial no está configurado adecuadamente en el servidor (Falta API Key).")
+        st.error("⚠️ El servicio de Inteligencia Artificial no está configurado en el servidor (Falta API Key).")
     else:
         with st.spinner(f"Consultando datos en tiempo real y ejecutando modelos matemáticos para {ticker_final}..."):
             try:
-                # Descarga de datos
+                # Descarga de datos bursátiles
                 stock = yf.Ticker(ticker_final)
                 df = stock.history(period="1y")
                 info = stock.info
@@ -175,14 +175,12 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                 if df.empty:
                     st.error(f"⚠️ No se encontraron datos para el símbolo '{ticker_final}'. Verifique que el ticker sea correcto en Yahoo Finance.")
                 else:
-                    # Ajuste de precios a la moneda seleccionada
                     tasa = conf_moneda["factor"]
                     simb = conf_moneda["simbolo"]
                     
-                    # Convertimos precios base en USD a la divisa seleccionada
+                    # Precios ajustados a la moneda de elección
                     precio_actual_raw = df['Close'].iloc[-1]
                     precio_actual = precio_actual_raw * tasa
-                    
                     df['Close_Moneda'] = df['Close'] * tasa
                     
                     # --- DATOS FUNDAMENTALES ---
@@ -240,20 +238,17 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                         
                     fechas_hist = df.index[-90:] # Últimos 90 días
                     precios_hist = df['Close_Moneda'].tail(90)
-                    
                     fechas_futuras = pd.date_range(start=df.index[-1], periods=dias_proy + 1, freq='B')
 
                     # Construcción del gráfico interactivo Plotly
                     fig = go.Figure()
 
-                    # Línea Histórica
                     fig.add_trace(go.Scatter(
                         x=fechas_hist, y=precios_hist,
                         mode='lines', name='Histórico Reciente',
                         line=dict(color='#29b6f6', width=2)
                     ))
 
-                    # Línea Proyectada
                     fig.add_trace(go.Scatter(
                         x=fechas_futuras, y=precios_futuros,
                         mode='lines', name='Proyección Econométrica',
@@ -319,7 +314,7 @@ if st.button("🚀 Ejecutar Análisis Multidimensional y Proyección", use_conta
                     4. **Veredicto Estratégico:** Proporcione una recomendación clara de gestión de riesgo (ej: Compras progresivas, Mantener en observación o Evitar entrada por alta volatilidad).
                     """
 
-                    # Llamada resiliente con reintentos
+                    # Llamada resiliente con conmutación automática de modelos
                     informe_ia = generar_respuesta_ia_robusta(client, prompt_ia)
 
                     st.markdown("### 📋 Dictamen Estratégico del Asistente")
