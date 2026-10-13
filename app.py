@@ -237,7 +237,7 @@ def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
     return None
 
 # ==============================================================================
-# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (GBM CALIBRADO PARA ACCIONES Y FOREX)
+# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (GBM CALIBRADO)
 # ==============================================================================
 def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500, es_forex=False):
     dias_historia = 60 if dias_proy <= 60 else (120 if dias_proy <= 180 else 252)
@@ -246,7 +246,6 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
     
-    # Factor de amortiguación estricto para divisas (evita bandas exageradas en FX)
     factor_escala = 0.35 if es_forex else 0.50
     drift_suavizado = 0.20 * mu_diario
     sigma_calibrado = sigma_diario * factor_escala
@@ -269,82 +268,43 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     percentil_superior = np.percentile(matriz_precios, 80, axis=1)
     
     return mediana_proyectada, percentil_inferior, percentil_superior
-    # ==============================================================================
+
+# ==============================================================================
 # DICCIONARIOS Y CONFIGURACIONES DE MERCADO
 # ==============================================================================
 DIVISAS = {
-    "USD": "Dólar Estadounidense (USD)", 
-    "PEN": "Sol Peruano (PEN)", 
-    "EUR": "Euro (EUR)",
-    "GBP": "Libra Esterlina (GBP)", 
-    "JPY": "Yen Japonés (JPY)", 
-    "MXN": "Peso Mexicano (MXN)",
-    "CLP": "Peso Chileno (CLP)", 
-    "COP": "Peso Colombiano (COP)", 
-    "BRL": "Real Brasileño (BRL)"
+    "USD": "Dólar Estadounidense (USD)", "PEN": "Sol Peruano (PEN)", "EUR": "Euro (EUR)",
+    "GBP": "Libra Esterlina (GBP)", "JPY": "Yen Japonés (JPY)", "MXN": "Peso Mexicano (MXN)",
+    "CLP": "Peso Chileno (CLP)", "COP": "Peso Colombiano (COP)", "BRL": "Real Brasileño (BRL)"
 }
 TICKER_MAP = {"SPCCPI1.LM": "SCCO", "SPCCPI2.LM": "SCCO"}
-TASAS_CAMBIO_USD = {
-    "USD ($)": 1.0, 
-    "PEN (S/.)": 3.75, 
-    "CLP ($)": 950.0, 
-    "BRL (R$)": 5.50, 
-    "MXN ($)": 19.50
-}
-SIMBOLOS_MONEDA = {
-    "USD ($)": "$", 
-    "PEN (S/.)": "S/.", 
-    "CLP ($)": "$ CLP", 
-    "BRL (R$)": "R$", 
-    "MXN ($)": "$ MXN"
-}
-MINIMOS_MONEDA = {
-    "USD ($)": 20.0, 
-    "PEN (S/.)": 75.0, 
-    "CLP ($)": 19000.0, 
-    "BRL (R$)": 110.0, 
-    "MXN ($)": 390.0
-}
+TASAS_CAMBIO_USD = {"USD ($)": 1.0, "PEN (S/.)": 3.75, "CLP ($)": 950.0, "BRL (R$)": 5.50, "MXN ($)": 19.50}
+SIMBOLOS_MONEDA = {"USD ($)": "$", "PEN (S/.)": "S/.", "CLP ($)": "$ CLP", "BRL (R$)": "R$", "MXN ($)": "$ MXN"}
+MINIMOS_MONEDA = {"USD ($)": 20.0, "PEN (S/.)": 75.0, "CLP ($)": 19000.0, "BRL (R$)": 110.0, "MXN ($)": 390.0}
 
-# Tasas de Referencia Institucionales Actualizadas (FED vs BCRP y otras regiones)
 TASAS_REFERENCIA_PAIS = {
-    "USD": 4.50,  # Tasa de fondos federales FED estimada
-    "PEN": 4.75,  # Tasa de referencia BCRP estimada
-    "EUR": 3.25,  # Tasa BCE
-    "GBP": 4.50,  # Tasa Banco de Inglaterra
-    "CLP": 5.00,  # Tasa Banco Central de Chile
-    "MXN": 10.00, # Tasa Banxico
-    "BRL": 11.25, # Tasa Banco Central de Brasil
-    "JPY": 0.50,  # Tasa Banco de Japón
-    "COP": 9.50   # Tasa Banco de la República Colombia
+    "USD": 4.50, "PEN": 4.75, "EUR": 3.25, "GBP": 4.50, "CLP": 5.00, 
+    "MXN": 10.00, "BRL": 11.25, "JPY": 0.50, "COP": 9.50
 }
 
 MERCADOS = {
     "NYSE / NASDAQ (Estados Unidos)": {
-        "AAPL": "Apple Inc.", 
-        "TSLA": "Tesla Inc.", 
-        "MSFT": "Microsoft Corp.", 
-        "NVDA": "NVIDIA Corp.", 
-        "AMZN": "Amazon.com Inc.", 
-        "GOOGL": "Alphabet Inc.", 
-        "SCCO": "Southern Copper Corp.", 
-        "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+        "AAPL": "Apple Inc.", "TSLA": "Tesla Inc.", "MSFT": "Microsoft Corp.", 
+        "NVDA": "NVIDIA Corp.", "AMZN": "Amazon.com Inc.", "GOOGL": "Alphabet Inc.", 
+        "SCCO": "Southern Copper Corp.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
     },
     "Bolsa de Valores de Lima (BVL - Perú)": {
-        "SPCCPI1.LM": "Southern Copper Corp. (BVL)", 
-        "BAP": "Credicorp Ltd.", 
-        "IFS": "Intercorp Financial Services", 
-        "CPACEN1.LM": "Cementos Pacasmayo", 
-        "ALICORC1.LM": "Alicorp S.A.A.", 
-        "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+        "SPCCPI1.LM": "Southern Copper Corp. (BVL)", "BAP": "Credicorp Ltd.", 
+        "IFS": "Intercorp Financial Services", "CPACEN1.LM": "Cementos Pacasmayo", 
+        "ALICORC1.LM": "Alicorp S.A.A.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
     }
 }
 
 CONTEXTO_GLOBAL_INSTITUCIONAL = """
 [CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL VIGENTE]: 
-1. Bancos Centrales (FED, BCE, BCRP): Las tasas de referencia determinan el diferencial cambiario y el costo de oportunidad del capital (WACC). 
-2. Mercados de Renta Variable y Divisas: Los inversores institucionales exigen múltiplos fundamentales sólidos y una estricta gestión de riesgos.
-3. Geopolítica y Commodities: La volatilidad en las materias primas (cobre, oro, petróleo WTI) y la liquidez global condicionan fuertemente el tipo de cambio y la prima de riesgo.
+1. Bancos Centrales (FED, BCE, BCRP): Las tasas de referencia determinan el costo de oportunidad del capital (WACC) y la liquidez global.
+2. Renta Variable y Asignación de Capital: Inversores con capital limitado frente al precio unitario deben considerar alternativas como acciones fraccionadas, fondos indexados (ETFs) o diversificación sectorial.
+3. Geopolítica y Commodities: La volatilidad global condiciona la prima de riesgo.
 """
 
 def obtener_factor_conversion(moneda_base_asset, moneda_destino_key):
@@ -515,34 +475,21 @@ with tab_acciones:
                     fig_stock = go.Figure()
                     
                     trace_hist = go.Scatter(
-                        x=fechas_historicas, 
-                        y=precios_historicos, 
-                        mode="lines", 
-                        name="Histórico Real (5 Años)", 
-                        line=dict(color="#10b981", width=2.0)
+                        x=fechas_historicas, y=precios_historicos, mode="lines", 
+                        name="Histórico Real (5 Años)", line=dict(color="#10b981", width=2.0)
                     )
                     trace_p90 = go.Scatter(
-                        x=fechas_futuras, 
-                        y=p90_mc, 
-                        mode="lines", 
-                        name="Escenario Optimista (P80)", 
-                        line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")
+                        x=fechas_futuras, y=p90_mc, mode="lines", 
+                        name="Escenario Optimista (P80)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")
                     )
                     trace_p10 = go.Scatter(
-                        x=fechas_futuras, 
-                        y=p10_mc, 
-                        mode="lines", 
-                        name="Escenario Pesimista (P20)", 
-                        line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), 
-                        fill="tonexty", 
-                        fillcolor="rgba(56, 189, 248, 0.05)"
+                        x=fechas_futuras, y=p10_mc, mode="lines", 
+                        name="Escenario Pesimista (P20)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), 
+                        fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"
                     )
                     trace_mediana = go.Scatter(
-                        x=fechas_futuras, 
-                        y=mediana_mc, 
-                        mode="lines", 
-                        name="Proyección Central GBM", 
-                        line=dict(color="#8b5cf6", width=3.0)
+                        x=fechas_futuras, y=mediana_mc, mode="lines", 
+                        name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)
                     )
 
                     fig_stock.add_trace(trace_hist)
@@ -584,11 +531,8 @@ with tab_acciones:
 
                 prompt_ia_stock = f"""
                 Actúa como el Director de Análisis Cuantitativo y Valoración de Activos de un Fondo de Inversión Global (Hedge Fund).
-                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (WACC, múltiplos PER {pe_ratio}, P/B {pb_ratio}, flujos de caja libre) y la macroeconomía actual (tasas FED, inflación, política monetaria).
-                PROHIBIDO dar respuestas vagas, superficiales o repetitivas. Cada tarjeta debe profundizar con argumentos matemáticos y reales en la realidad financiera del activo.
-
-                DATOS TÉCNICOS A EVALUAR:
-                {paquete_datos_analisis}
+                Redacta un análisis EXHAUSTIVO, sumamente técnico, riguroso y profesional sobre {ticker_final}. Cruza los datos financieros reales con la teoría de finanzas corporativas (WACC, múltiplos PER {pe_ratio}, P/B {pb_ratio}, flujos de caja libre) y la macroeconomía actual.
+                PROHIBIDO dar respuestas vagas o repetitivas. 
 
                 INSTRUCCIÓN ABSOLUTA: Devuelve tu respuesta EXCLUSIVAMENTE en un objeto JSON válido y limpio. Cero comillas triples Markdown, cero texto adicional fuera del JSON.
                 
@@ -597,8 +541,9 @@ with tab_acciones:
                   "diagnostico": "Análisis fundamental profundo. Evalúa el PER ({pe_ratio}), el P/B ({pb_ratio}) y la valoración del activo frente a su sector y la política monetaria global actual.",
                   "viabilidad": "1. Análisis de Capital: Compara matemáticamente el capital de {simbolo_moneda} {capital_input:,.2f} frente al precio unitario de {simbolo_moneda} {precio_actual:,.2f}. 2. Análisis de Perfil: Contrasta la volatilidad del {volatilidad_anualizada:.2%} con el perfil de riesgo {perfil_riesgo}.",
                   "riesgos": "Detalla 3 riesgos críticos y específicos del activo en formato de lista numérica: 1. Riesgo de tasas y costo de capital. 2. Riesgos sistémicos del sector. 3. Volatilidad macroeconómica.",
+                  "conclusion_tecnica": "Conclusión técnica específica centrada en la valoración econométrica y la relación riesgo-retorno del activo.",
                   "veredicto": "COMPRAR, DESESTIMAR o MANTENER EN OBSERVACIÓN",
-                  "fundamento": "Dictamen ejecutivo directo y severo. Explica con total claridad y sin ambigüedades la justificación financiera e institucional de la decisión tomada."
+                  "dictamen_institucional": "Resumen ejecutivo integral y recomendación financiera específica adaptada al capital de {simbolo_moneda} {capital_input:,.2f} y perfil {perfil_riesgo}. Recomienda instrumentos financieros concretos (ej. acciones fraccionadas, ETFs diversificados o renta fija) y explica claramente el porqué de la decisión."
                 }}
                 """
 
@@ -612,8 +557,9 @@ with tab_acciones:
                             "diagnostico": f"El activo {ticker_final} cotiza a un precio spot de {simbolo_moneda} {precio_actual:,.2f} con un ratio PER de {pe_ratio} y P/B de {pb_ratio}. La valoración actual refleja dinámicas mixtas en el sector {sector_empresa} frente al endurecimiento de las tasas de descuento globales.",
                             "viabilidad": f"Con un capital disponible de {simbolo_moneda} {capital_input:,.2f} frente al precio unitario de {simbolo_moneda} {precio_actual:,.2f}, la asignación bajo el perfil {perfil_riesgo} resulta {'inviable para una posición accionaria completa' if es_capital_insuficiente else 'viable operativamente'}.",
                             "riesgos": "1. Sensibilidad del múltiplo de valoración a los vaivenes en las tasas de interés de referencia.\n2. Presión sobre los márgenes operativos ante menores volúmenes de demanda.\n3. Riesgo de liquidez y profundidad en las órdenes de ejecución.",
+                            "conclusion_tecnica": f"Dictamen técnico: La relación entre el capital disponible ({simbolo_moneda} {capital_input:,.2f}) y la exposición al riesgo con una volatilidad anualizada del {volatilidad_anualizada:.2%} exige prudencia táctica.",
                             "veredicto": "DESESTIMAR" if es_capital_insuficiente else "MANTENER EN OBSERVACIÓN",
-                            "fundamento": f"Dictamen institucional definitivo: La relación entre el capital disponible ({simbolo_moneda} {capital_input:,.2f}) y la exposición al riesgo con una volatilidad anualizada del {volatilidad_anualizada:.2%} exige prudencia táctica y reevaluación de entradas."
+                            "dictamen_institucional": f"Dictamen Institucional Integral: Dado tu capital de {simbolo_moneda} {capital_input:,.2f} y perfil {perfil_riesgo}, comprar una unidad entera a {simbolo_moneda} {precio_actual:,.2f} no es óptimo. Se recomienda utilizar herramientas de corretaje con **acciones fraccionadas** o diversificar en **ETFs indexados globales** para mitigar la volatilidad del {volatilidad_anualizada:.2%}."
                         }
 
                     col_c1, col_c2, col_c3, col_c4 = st.columns(4)
@@ -624,13 +570,13 @@ with tab_acciones:
                     with col_c3:
                         st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>3. Riesgos Sistémicos e Inflación</div><div class='analysis-card-body'>{json_stock.get('riesgos', '').replace(chr(10), '<br>')}</div></div>", unsafe_allow_html=True)
                     with col_c4:
-                        st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>4. Conclusión Técnica</div><div class='analysis-card-body'>{json_stock.get('fundamento', '')}</div></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>4. Conclusión Técnica</div><div class='analysis-card-body'>{json_stock.get('conclusion_tecnica', '')}</div></div>", unsafe_allow_html=True)
 
                     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
 
                     bot_col_a, bot_col_b = st.columns([3, 1])
                     with bot_col_a:
-                        st.markdown(f"<div class='decision-container'><div class='analysis-card-title' style='font-size: 1.2rem; border-bottom: none;'>🎯 Dictamen Institucional</div><div class='analysis-card-body' style='font-size: 1rem; color: #f8fafc;'>{json_stock.get('fundamento', '')}</div></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='decision-container'><div class='analysis-card-title' style='font-size: 1.2rem; border-bottom: none;'>🎯 Dictamen Institucional</div><div class='analysis-card-body' style='font-size: 1rem; color: #f8fafc;'>{json_stock.get('dictamen_institucional', '')}</div></div>", unsafe_allow_html=True)
                     with bot_col_b:
                         veredicto_procesado = str(json_stock.get("veredicto", "MANTENER EN OBSERVACIÓN")).upper()
                         if "COMPRAR" in veredicto_procesado and "DESESTIMAR" not in veredicto_procesado:
@@ -640,6 +586,7 @@ with tab_acciones:
                         else:
                             badge_cls, badge_ico, badge_txt = "decision-observacion", "🟡", "EN OBSERVACIÓN"
                         st.markdown(f"<div class='decision-badge-box {badge_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_txt}</div></div>", unsafe_allow_html=True)
+
 # ==============================================================================
 # PESTAÑA 2: COMPARATIVA DE DIVISAS (FOREX) EXTENDIDO
 # ==============================================================================
@@ -707,34 +654,21 @@ with tab_forex:
                     fig_fx = go.Figure()
                     
                     trace_fx_hist = go.Scatter(
-                        x=fechas_hist_fx, 
-                        y=df_fx["Close"], 
-                        mode="lines", 
-                        name="Tipo de Cambio Histórico", 
-                        line=dict(color="#10b981", width=2.0)
+                        x=fechas_hist_fx, y=df_fx["Close"], mode="lines", 
+                        name="Tipo de Cambio Histórico", line=dict(color="#10b981", width=2.0)
                     )
                     trace_fx_p90 = go.Scatter(
-                        x=fechas_futuras_fx, 
-                        y=p90_fx, 
-                        mode="lines", 
-                        name="Escenario Volatilidad (P80)", 
-                        line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")
+                        x=fechas_futuras_fx, y=p90_fx, mode="lines", 
+                        name="Escenario Volatilidad (P80)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")
                     )
                     trace_fx_p10 = go.Scatter(
-                        x=fechas_futuras_fx, 
-                        y=p10_fx, 
-                        mode="lines", 
-                        name="Escenario Caída (P20)", 
-                        line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), 
-                        fill="tonexty", 
-                        fillcolor="rgba(56, 189, 248, 0.05)"
+                        x=fechas_futuras_fx, y=p10_fx, mode="lines", 
+                        name="Escenario Caída (P20)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), 
+                        fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"
                     )
                     trace_fx_mediana = go.Scatter(
-                        x=fechas_futuras_fx, 
-                        y=mediana_fx, 
-                        mode="lines", 
-                        name="Proyección Central GBM", 
-                        line=dict(color="#8b5cf6", width=3.0)
+                        x=fechas_futuras_fx, y=mediana_fx, mode="lines", 
+                        name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)
                     )
 
                     fig_fx.add_trace(trace_fx_hist)
