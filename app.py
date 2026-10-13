@@ -511,4 +511,114 @@ with tab_forex:
         with col_fx4: horizonte_fx = st.selectbox("⏱️ Horizonte Temporal:", ["Corto Plazo (1 a 3 meses)", "Mediano Plazo (6 meses a 1 año)", "Largo Plazo (1 año a más)"], key="fx_horizonte")
         with col_fx5: proposito_fx = st.selectbox("🎯 Propósito de la Evaluación:", ["Cobertura de Riesgo Cambiario (Hedging)", "Operación de Comercio Exterior", "Inversión Especulativa", "Ahorro / Reserva de Valor"], key="fx_proposito")
 
-    st.markdown("<div style='margin-top: 15px;'></div>
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+    if st.button("🚀 Ejecutar Análisis Cuantitativo de Divisas", use_container_width=True, key="btn_forex"):
+        if not api_key_oculta or not client:
+            st.error("⚠️ Falta GEMINI_API_KEY en los Secrets.")
+        else:
+            datos_fx_cargados = False
+            try:
+                df_fx = obtener_historial_forex(base_curr, target_curr)
+                if df_fx.empty:
+                    st.error(f"⚠️ Historial de {base_curr}/{target_curr} no encontrado.")
+                else:
+                    datos_fx_cargados = True
+                    rate_actual = df_fx["Close"].iloc[-1]
+                    df_fx["Retorno_Diario"] = df_fx["Close"].pct_change()
+                    volatilidad_anual = df_fx["Retorno_Diario"].std() * np.sqrt(252)
+                    var_5y_pct = ((rate_actual - df_fx["Close"].iloc[0]) / df_fx["Close"].iloc[0]) * 100
+
+                    st.markdown(f"### 📊 Panel de Indicadores Clave - {base_curr}/{target_curr}")
+                    c_fx1, c_fx2, c_fx3, c_fx4 = st.columns(4)
+                    c_fx1.metric("Tipo de Cambio Actual", f"{rate_actual:,.4f}")
+                    c_fx2.metric("Monto Convertido", f"{monto_fx * rate_actual:,.2f} {target_curr}")
+                    c_fx3.metric("Volatilidad Anualizada", f"{volatilidad_anual:.2%}")
+                    c_fx4.metric("Variación Histórica 5A", f"{var_5y_pct:+.2f}%")
+                    st.markdown("---")
+
+                    st.markdown(f"### 📈 Proyección GBM Monte Carlo ({horizonte_fx})")
+                    dias_proy = 60 if "1 a 3 meses" in horizonte_fx else (180 if "6 meses a 1 año" in horizonte_fx else 365)
+                    mediana_fx, p10_fx, p90_fx = simular_monte_carlo_gbm(rate_actual, df_fx["Retorno_Diario"].dropna(), dias_proy)
+                    
+                    fechas_hist = df_fx.index
+                    fechas_futuras = pd.date_range(start=df_fx.index[-1], periods=dias_proy + 1, freq="B")
+
+                    fig_fx = go.Figure()
+                    fig_fx.add_trace(go.Scatter(x=fechas_hist, y=df_fx["Close"], mode="lines", name="Tipo de Cambio Histórico", line=dict(color="#10b981", width=2.0)))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p90_fx, mode="lines", name="Escenario Volatilidad (P90)", line=dict(color="rgba(56, 189, 248, 0.5)", dash="dash")))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=p10_fx, mode="lines", name="Escenario Caída (P10)", line=dict(color="rgba(239, 68, 68, 0.5)", dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)"))
+                    fig_fx.add_trace(go.Scatter(x=fechas_futuras, y=mediana_fx, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
+
+                    fig_fx.update_layout(
+                        xaxis=dict(title="Fecha", gridcolor="#1e293b", fixedrange=False),
+                        yaxis=dict(title=f"Tasa ({base_curr}/{target_curr})", gridcolor="#1e293b", fixedrange=False, autorange=True),
+                        template="plotly_dark", paper_bgcolor="#020617", plot_bgcolor="#020617",
+                        height=550, dragmode="pan", hovermode="x unified",
+                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(15,23,42,0.9)")
+                    )
+                    st.plotly_chart(fig_fx, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToAdd': ['drawline', 'eraseshape']})
+                    
+                    # ADVERTENCIA LEGAL Y TIP DE ZOOM
+                    st.markdown("""
+                    <div class='disclaimer-box'>
+                        <strong>⚠️ Aviso Legal y de Riesgo:</strong> Esta plataforma es una herramienta de análisis cuantitativo e inteligencia artificial. Las proyecciones estocásticas (Monte Carlo) y los dictámenes automatizados <strong>NO constituyen asesoramiento financiero garantizado ni recomendaciones formales de inversión</strong>. El rendimiento histórico no garantiza resultados futuros. El usuario asume total responsabilidad por las decisiones tomadas con capital real.<br><br>
+                        <span style='color: #38bdf8;'>💡 <strong>Tip de Interfaz (Gráficos):</strong> Utiliza la rueda del ratón para hacer zoom. Haz clic sostenido y arrastra para moverte a lo largo del tiempo. Haz doble clic en el gráfico para resetear la vista original.</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("---")
+
+            except Exception as e:
+                st.error(f"Error procesando divisas: {str(e)}")
+
+            if datos_fx_cargados:
+                st.markdown(f"## 📋 Dictamen Estratégico FX Institucional ({base_curr}/{target_curr})")
+
+                prompt_fx = f"""
+                Eres el Jefe de Macroeconomía Global y Divisas (FX) de un banco de inversión top.
+                Redacta un análisis profundo y fundamentado cruzando los datos técnicos con el contexto geopolítico actual, políticas de Bancos Centrales (FED) y commodities.
+                
+                DATOS TÉCNICOS:
+                Tipo de Cambio Actual: {rate_actual:,.4f} | Volatilidad: {volatilidad_anual:.2%} | Horizonte: {horizonte_fx} | Propósito: {proposito_fx}.
+                {CONTEXTO_GLOBAL}
+                
+                INSTRUCCIÓN CRÍTICA: Debes devolver tu respuesta EXCLUSIVAMENTE en un formato JSON válido y limpio. Sin formato Markdown.
+                
+                ESTRUCTURA JSON REQUERIDA:
+                {{
+                  "diagnostico": "Análisis profundo de la fuerza relativa del {base_curr} vs {target_curr} y diferencial de tasas.",
+                  "viabilidad": "Analiza la conveniencia real de convertir/cubrir {monto_fx} {base_curr} hoy, basado en la tendencia macroeconómica.",
+                  "riesgos": "Detalla 3 riesgos críticos (FED, Commodities, Geopolítico).",
+                  "veredicto": "FORTALECIMIENTO, DEBILITAMIENTO o NEUTRAL",
+                  "fundamento": "Conclusión ejecutiva dictando la estrategia a seguir respaldada por la economía global."
+                }}
+                """
+                with st.spinner("🤖 Analizando contexto FED, Bancos Centrales, Commodities y Macro Global..."):
+                    raw_response_fx = generar_respuesta_ia_rapida(client, prompt_fx)
+                    data_json_fx = parse_json_respuesta(raw_response_fx)
+
+                    if not data_json_fx:
+                        data_json_fx = {
+                            "diagnostico": "El motor de IA Global experimentó un retraso temporal. La volatilidad histórica actual se mantiene vigente para su evaluación manual.",
+                            "viabilidad": "Evalúe los gráficos de Monte Carlo superiores para determinar soportes y resistencias.",
+                            "riesgos": "Riesgo cambiario estándar, políticas del banco central local y externo.",
+                            "veredicto": "NEUTRAL",
+                            "fundamento": "Reintente la consulta en unos segundos para cargar el reporte macroeconómico avanzado completo."
+                        }
+
+                    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+                    with col_f1: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>1. Diagnóstico Macro / Tasas</div><div class='analysis-card-body'>{limpiar_texto_markdown(data_json_fx.get('diagnostico', ''))}</div></div>", unsafe_allow_html=True)
+                    with col_f2: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>2. Sensibilidad y Cobertura</div><div class='analysis-card-body'>{limpiar_texto_markdown(data_json_fx.get('viabilidad', ''))}</div></div>", unsafe_allow_html=True)
+                    with col_f3: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>3. Riesgo Geopolítico / FED</div><div class='analysis-card-body'>{limpiar_texto_markdown(data_json_fx.get('riesgos', '')).replace(chr(10), '<br>')}</div></div>", unsafe_allow_html=True)
+                    with col4: st.markdown(f"<div class='analysis-card'><div class='analysis-card-title'>4. Posicionamiento Estratégico</div><div class='analysis-card-body'>{limpiar_texto_markdown(data_json_fx.get('fundamento', ''))}</div></div>", unsafe_allow_html=True)
+
+                    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+
+                    bot_fx1, bot_fx2 = st.columns([3, 1])
+                    with bot_fx1: st.markdown(f"<div class='decision-container'><div class='analysis-card-title' style='font-size: 1.2rem; border-bottom: none;'>🎯 Estrategia Direccional FX</div><div class='analysis-card-body' style='font-size: 1rem; color: #f8fafc;'>{limpiar_texto_markdown(data_json_fx.get('fundamento', ''))}</div></div>", unsafe_allow_html=True)
+                    with bot_fx2:
+                        veredicto_fx = str(data_json_fx.get("veredicto", "NEUTRAL")).upper()
+                        if "FORTALECIMIENTO" in veredicto_fx or "COMPRA" in veredicto_fx: badge_fx_class, badge_fx_icon, badge_fx_text = "decision-comprar", "🟢", "ALCISTA (LONG)"
+                        elif "DEBILITAMIENTO" in veredicto_fx or "VENTA" in veredicto_fx: badge_fx_class, badge_fx_icon, badge_fx_text = "decision-desestimar", "🔴", "BAJISTA (SHORT)"
+                        else: badge_fx_class, badge_fx_icon, badge_fx_text = "decision-observacion", "🟡", "NEUTRAL"
+                        st.markdown(f"<div class='decision-badge-box {badge_fx_class}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_fx_icon}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_fx_text}</div></div>", unsafe_allow_html=True)
