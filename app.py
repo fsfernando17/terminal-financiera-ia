@@ -219,11 +219,16 @@ def parse_json_respuesta(texto_crudo):
 
 def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
     modelos_disponibles = ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
-    configuracion_tokens = types.GenerateContentConfig(temperature=0.2, max_output_tokens=4000)
+    configuracion_tokens = types.GenerateContentConfig(
+        temperature=0.2, 
+        max_output_tokens=4000
+    )
     for modelo in modelos_disponibles:
         try:
             respuesta = cliente_genai.models.generate_content(
-                model=modelo, contents=prompt_sistema, config=configuracion_tokens
+                model=modelo, 
+                contents=prompt_sistema, 
+                config=configuracion_tokens
             )
             if respuesta and respuesta.text:
                 return respuesta.text
@@ -232,17 +237,15 @@ def generar_respuesta_ia_robusta(cliente_genai, prompt_sistema):
     return None
 
 # ==============================================================================
-# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (MOVIMIENTO BROWNIANO GEOMÉTRICO CALIBRADO)
+# MOTOR ECONOMÉTRICO & MODELO ESTOCÁSTICO (MOVIMIENTO BROWNIANO GEOMÉTRICO)
 # ==============================================================================
 def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_simulaciones=500):
-    """Simula trayectorias estocásticas con deriva realista y bandas acopladas a la volatilidad real del activo."""
     dias_historia = 60 if dias_proy <= 60 else (120 if dias_proy <= 180 else 252)
     retornos_recientes = retornos_diarios.tail(dias_historia) if len(retornos_diarios) > dias_historia else retornos_diarios
     
     mu_diario = retornos_recientes.mean()
     sigma_diario = retornos_recientes.std()
     
-    # Deriva neutralizada y factor de escala estricto para evitar proyecciones artificialmente disparadas
     drift_suavizado = 0.25 * mu_diario
     sigma_calibrado = sigma_diario * 0.50
     
@@ -253,40 +256,72 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     choques_aleatorios = np.random.normal(0, 1, (dias_proy, num_simulaciones))
     
     for t in range(1, dias_proy + 1):
-        # Escalamiento por raíz cuadrada del tiempo para un cono de confianza suave y realista
         factor_tiempo = np.sqrt(t / dias_proy)
-        retornos_simulados = np.exp(drift + sigma_calibrado * choques_aleatorios[t - 1] * (0.7 + 0.3 * factor_tiempo))
+        retornos_simulados = np.exp(
+            drift + sigma_calibrado * choques_aleatorios[t - 1] * (0.7 + 0.3 * factor_tiempo)
+        )
         matriz_precios[t] = matriz_precios[t - 1] * retornos_simulados
         
     mediana_proyectada = np.median(matriz_precios, axis=1)
-    percentil_inferior = np.percentile(matriz_precios, 20, axis=1) # P20 robusto y acotado
-    percentil_superior = np.percentile(matriz_precios, 80, axis=1) # P80 robusto y acotado
+    percentil_inferior = np.percentile(matriz_precios, 20, axis=1)
+    percentil_superior = np.percentile(matriz_precios, 80, axis=1)
     
     return mediana_proyectada, percentil_inferior, percentil_superior
-
-# ==============================================================================
+    # ==============================================================================
 # DICCIONARIOS Y CONFIGURACIONES DE MERCADO
 # ==============================================================================
 DIVISAS = {
-    "USD": "Dólar Estadounidense (USD)", "PEN": "Sol Peruano (PEN)", "EUR": "Euro (EUR)",
-    "GBP": "Libra Esterlina (GBP)", "JPY": "Yen Japonés (JPY)", "MXN": "Peso Mexicano (MXN)",
-    "CLP": "Peso Chileno (CLP)", "COP": "Peso Colombiano (COP)", "BRL": "Real Brasileño (BRL)"
+    "USD": "Dólar Estadounidense (USD)", 
+    "PEN": "Sol Peruano (PEN)", 
+    "EUR": "Euro (EUR)",
+    "GBP": "Libra Esterlina (GBP)", 
+    "JPY": "Yen Japonés (JPY)", 
+    "MXN": "Peso Mexicano (MXN)",
+    "CLP": "Peso Chileno (CLP)", 
+    "COP": "Peso Colombiano (COP)", 
+    "BRL": "Real Brasileño (BRL)"
 }
 TICKER_MAP = {"SPCCPI1.LM": "SCCO", "SPCCPI2.LM": "SCCO"}
-TASAS_CAMBIO_USD = {"USD ($)": 1.0, "PEN (S/.)": 3.75, "CLP ($)": 950.0, "BRL (R$)": 5.50, "MXN ($)": 19.50}
-SIMBOLOS_MONEDA = {"USD ($)": "$", "PEN (S/.)": "S/.", "CLP ($)": "$ CLP", "BRL (R$)": "R$", "MXN ($)": "$ MXN"}
-MINIMOS_MONEDA = {"USD ($)": 20.0, "PEN (S/.)": 75.0, "CLP ($)": 19000.0, "BRL (R$)": 110.0, "MXN ($)": 390.0}
+TASAS_CAMBIO_USD = {
+    "USD ($)": 1.0, 
+    "PEN (S/.)": 3.75, 
+    "CLP ($)": 950.0, 
+    "BRL (R$)": 5.50, 
+    "MXN ($)": 19.50
+}
+SIMBOLOS_MONEDA = {
+    "USD ($)": "$", 
+    "PEN (S/.)": "S/.", 
+    "CLP ($)": "$ CLP", 
+    "BRL (R$)": "R$", 
+    "MXN ($)": "$ MXN"
+}
+MINIMOS_MONEDA = {
+    "USD ($)": 20.0, 
+    "PEN (S/.)": 75.0, 
+    "CLP ($)": 19000.0, 
+    "BRL (R$)": 110.0, 
+    "MXN ($)": 390.0
+}
 
 MERCADOS = {
     "NYSE / NASDAQ (Estados Unidos)": {
-        "AAPL": "Apple Inc.", "TSLA": "Tesla Inc.", "MSFT": "Microsoft Corp.", 
-        "NVDA": "NVIDIA Corp.", "AMZN": "Amazon.com Inc.", "GOOGL": "Alphabet Inc.", 
-        "SCCO": "Southern Copper Corp.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+        "AAPL": "Apple Inc.", 
+        "TSLA": "Tesla Inc.", 
+        "MSFT": "Microsoft Corp.", 
+        "NVDA": "NVIDIA Corp.", 
+        "AMZN": "Amazon.com Inc.", 
+        "GOOGL": "Alphabet Inc.", 
+        "SCCO": "Southern Copper Corp.", 
+        "🔍 Buscar otro Ticker manualmente": "CUSTOM"
     },
     "Bolsa de Valores de Lima (BVL - Perú)": {
-        "SPCCPI1.LM": "Southern Copper Corp. (BVL)", "BAP": "Credicorp Ltd.", 
-        "IFS": "Intercorp Financial Services", "CPACEN1.LM": "Cementos Pacasmayo", 
-        "ALICORC1.LM": "Alicorp S.A.A.", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+        "SPCCPI1.LM": "Southern Copper Corp. (BVL)", 
+        "BAP": "Credicorp Ltd.", 
+        "IFS": "Intercorp Financial Services", 
+        "CPACEN1.LM": "Cementos Pacasmayo", 
+        "ALICORC1.LM": "Alicorp S.A.A.", 
+        "🔍 Buscar otro Ticker manualmente": "CUSTOM"
     }
 }
 
@@ -348,7 +383,6 @@ def obtener_historial_forex(base_curr, target_curr):
     except Exception:
         pass
     return pd.DataFrame()
-
 
 # ==============================================================================
 # ENCABEZADO Y TABS DE NAVEGACIÓN INSTITUCIONAL
@@ -464,10 +498,42 @@ with tab_acciones:
                     fechas_futuras = pd.date_range(start=df_stock.index[-1], periods=dias_proyeccion + 1, freq="B")
 
                     fig_stock = go.Figure()
-                    fig_stock.add_trace(go.Scatter(x=fechas_historicas, y=precios_historicos, mode="lines", name="Histórico Real (5 Años)", line=dict(color="#10b981", width=2.0)))
-                    fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=p90_mc, mode="lines", name="Escenario Optimista (P80)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
-                    fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=p10_mc, mode="lines", name="Escenario Pesimista (P20)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
-                    fig_stock.add_trace(go.Scatter(x=fechas_futuras, y=mediana_mc, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
+                    
+                    trace_hist = go.Scatter(
+                        x=fechas_historicas, 
+                        y=precios_historicos, 
+                        mode="lines", 
+                        name="Histórico Real (5 Años)", 
+                        line=dict(color="#10b981", width=2.0)
+                    )
+                    trace_p90 = go.Scatter(
+                        x=fechas_futuras, 
+                        y=p90_mc, 
+                        mode="lines", 
+                        name="Escenario Optimista (P80)", 
+                        line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")
+                    )
+                    trace_p10 = go.Scatter(
+                        x=fechas_futuras, 
+                        y=p10_mc, 
+                        mode="lines", 
+                        name="Escenario Pesimista (P20)", 
+                        line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), 
+                        fill="tonexty", 
+                        fillcolor="rgba(56, 189, 248, 0.05)"
+                    )
+                    trace_mediana = go.Scatter(
+                        x=fechas_futuras, 
+                        y=mediana_mc, 
+                        mode="lines", 
+                        name="Proyección Central GBM", 
+                        line=dict(color="#8b5cf6", width=3.0)
+                    )
+
+                    fig_stock.add_trace(trace_hist)
+                    fig_stock.add_trace(trace_p90)
+                    fig_stock.add_trace(trace_p10)
+                    fig_stock.add_trace(trace_mediana)
 
                     fig_stock.update_layout(
                         xaxis=dict(title="Fecha", gridcolor="#1e293b", fixedrange=False),
@@ -559,9 +625,7 @@ with tab_acciones:
                         else:
                             badge_cls, badge_ico, badge_txt = "decision-observacion", "🟡", "EN OBSERVACIÓN"
                         st.markdown(f"<div class='decision-badge-box {badge_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_txt}</div></div>", unsafe_allow_html=True)
-
-
-# ==============================================================================
+                     # ==============================================================================
 # PESTAÑA 2: COMPARATIVA DE DIVISAS (FOREX) EXTENDIDO
 # ==============================================================================
 with tab_forex:
@@ -615,10 +679,42 @@ with tab_forex:
                     fechas_futuras_fx = pd.date_range(start=df_fx.index[-1], periods=dias_proy_fx + 1, freq="B")
 
                     fig_fx = go.Figure()
-                    fig_fx.add_trace(go.Scatter(x=fechas_hist_fx, y=df_fx["Close"], mode="lines", name="Tipo de Cambio Histórico", line=dict(color="#10b981", width=2.0)))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p90_fx, mode="lines", name="Escenario Volatilidad (P80)", line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=p10_fx, mode="lines", name="Escenario Caída (P20)", line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.05)")))
-                    fig_fx.add_trace(go.Scatter(x=fechas_futuras_fx, y=mediana_fx, mode="lines", name="Proyección Central GBM", line=dict(color="#8b5cf6", width=3.0)))
+                    
+                    trace_fx_hist = go.Scatter(
+                        x=fechas_hist_fx, 
+                        y=df_fx["Close"], 
+                        mode="lines", 
+                        name="Tipo de Cambio Histórico", 
+                        line=dict(color="#10b981", width=2.0)
+                    )
+                    trace_fx_p90 = go.Scatter(
+                        x=fechas_futuras_fx, 
+                        y=p90_fx, 
+                        mode="lines", 
+                        name="Escenario Volatilidad (P80)", 
+                        line=dict(color="rgba(56, 189, 248, 0.5)", width=1.5, dash="dash")
+                    )
+                    trace_fx_p10 = go.Scatter(
+                        x=fechas_futuras_fx, 
+                        y=p10_fx, 
+                        mode="lines", 
+                        name="Escenario Caída (P20)", 
+                        line=dict(color="rgba(239, 68, 68, 0.5)", width=1.5, dash="dash"), 
+                        fill="tonexty", 
+                        fillcolor="rgba(56, 189, 248, 0.05)"
+                    )
+                    trace_fx_mediana = go.Scatter(
+                        x=fechas_futuras_fx, 
+                        y=mediana_fx, 
+                        mode="lines", 
+                        name="Proyección Central GBM", 
+                        line=dict(color="#8b5cf6", width=3.0)
+                    )
+
+                    fig_fx.add_trace(trace_fx_hist)
+                    fig_fx.add_trace(trace_fx_p90)
+                    fig_fx.add_trace(trace_fx_p10)
+                    fig_fx.add_trace(trace_fx_mediana)
 
                     fig_fx.update_layout(
                         xaxis=dict(title="Fecha", gridcolor="#1e293b", fixedrange=False),
@@ -700,4 +796,4 @@ with tab_forex:
                             badge_f_cls, badge_f_ico, badge_f_txt = "decision-desestimar", "🔴", "BAJISTA (SHORT)"
                         else:
                             badge_f_cls, badge_f_ico, badge_f_txt = "decision-observacion", "🟡", "NEUTRAL"
-                        st.markdown(f"<div class='decision-badge-box {badge_f_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_f_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_f_txt}</div></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='decision-badge-box {badge_f_cls}'><div style='font-size: 2.5rem; margin-bottom: 8px;'>{badge_f_ico}</div><div style='font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em;'>{badge_f_txt}</div></div>", unsafe_allow_html=True)   
