@@ -184,7 +184,6 @@ st.markdown(
         line-height: 1.6;
     }
     
-    /* Tarjeta de métrica con nota integrada DENTRO */
     .metric-card-custom {
         background: #0f172a;
         border: 1px solid rgba(56, 189, 248, 0.15);
@@ -470,7 +469,7 @@ with tab_acciones:
                     moneda_base_ticker = info_stock.get("currency", "USD")
                     tasa_conv_real, fuente_tasa = obtener_tipo_cambio_real(moneda_base_ticker, moneda_sel)
 
-                    precio_actual = df_stock["Close"].iloc[-1] * tasa_conv_real
+                    precio_actual = float(df_stock["Close"].iloc[-1]) * tasa_conv_real
                     df_stock["Close_Moneda"] = df_stock["Close"] * tasa_conv_real
                     
                     market_cap_raw = info_stock.get("marketCap")
@@ -488,7 +487,7 @@ with tab_acciones:
 
                     st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
                     
-                    # 9 Tarjetas con notas integradas 100% DENTRO de los recuadros usando HTML personalizado
+                    # 9 Tarjetas con notas integradas 100% DENTRO de los recuadros
                     c_m1, c_m2, c_m3, c_m4, c_m5 = st.columns(5)
                     with c_m1:
                         st.markdown(f"""
@@ -736,7 +735,7 @@ with tab_forex:
                     st.error(f"⚠️ El historial para la paridad {base_curr}/{target_curr} no está disponible.")
                 else:
                     datos_fx_cargados = True
-                    rate_actual = df_fx["Close"].iloc[-1]
+                    rate_actual = float(df_fx["Close"].iloc[-1])
                     df_fx["Retorno_Diario"] = df_fx["Close"].pct_change()
                     volatilidad_fx = df_fx["Retorno_Diario"].std() * np.sqrt(252)
                     variacion_5y = ((rate_actual - df_fx["Close"].iloc[0]) / df_fx["Close"].iloc[0]) * 100
@@ -747,7 +746,6 @@ with tab_forex:
 
                     st.markdown(f"### 📊 Panel de Indicadores Clave & Tasas de Referencia - {base_curr}/{target_curr}")
                     
-                    # 8 Tarjetas FX con notas integradas 100% DENTRO de los recuadros
                     c_x1, c_x2, c_x3, c_x4 = st.columns(4)
                     with c_x1:
                         st.markdown(f"""
