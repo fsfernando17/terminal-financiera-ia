@@ -184,7 +184,6 @@ st.markdown(
         line-height: 1.6;
     }
     
-    /* Tarjeta de métrica con nota integrada DENTRO */
     .metric-card-custom {
         background: #0f172a;
         border: 1px solid rgba(56, 189, 248, 0.15);
@@ -292,7 +291,7 @@ def simular_monte_carlo_gbm(precio_inicial, retornos_diarios, dias_proy, num_sim
     return mediana_proyectada, percentil_inferior, percentil_superior
 
 # ==============================================================================
-# DICCIONARIOS Y CONFIGURACIONES DE MERCADO (AMPLIADOS INTERNACIONALMENTE)
+# DICCIONARIOS Y CONFIGURACIONES DE MERCADO
 # ==============================================================================
 DIVISAS = {
     "USD": "Dólar Estadounidense (USD)", "PEN": "Sol Peruano (PEN)", "EUR": "Euro (EUR)",
@@ -366,12 +365,6 @@ MERCADOS = {
         "MC.PA": "LVMH Moët Hennessy (Francia)", "SIE.DE": "Siemens AG (Alemania)", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
     }
 }
-
-CONTEXTO_GLOBAL_INSTITUCIONAL = """
-[CONTEXTO MACROECONÓMICO Y FINANCIERO INSTITUCIONAL VIGENTE]: 
-1. Bancos Centrales (FED, BCE, BCRP, PBoC, BoJ): Tasas de referencia y política monetaria global.
-2. Modelos Cuantitativos y Estocásticos: Simulación de Monte Carlo (GBM), VaR y análisis fundamental por activo.
-"""
 
 def obtener_tipo_cambio_real(moneda_base_ticker, moneda_destino_key):
     try:
@@ -500,7 +493,6 @@ with tab_acciones:
 
                     st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
                     
-                    # 9 Tarjetas con notas integradas 100% DENTRO de los recuadros usando HTML personalizado
                     c_m1, c_m2, c_m3, c_m4, c_m5 = st.columns(5)
                     with c_m1:
                         st.markdown(f"""
@@ -634,7 +626,7 @@ with tab_acciones:
                     fig_stock.add_trace(trace_mediana)
 
                     fig_stock.update_layout(
-                        xaxis=dict(title="Fecha", gridcolor="#1e293b", fixedrange=False),
+                        xaxis=dict(title="Fecha", gridcolor="#1e293b", fixedrange=False, range=[fechas_historicas[0], fechas_futuras[-1]]),
                         yaxis=dict(title=f"Precio ({simbolo_moneda})", gridcolor="#1e293b", fixedrange=False, autorange=True),
                         template="plotly_dark", paper_bgcolor="#020617", plot_bgcolor="#020617",
                         height=550, dragmode="pan", hovermode="x unified",
@@ -881,7 +873,7 @@ with tab_forex:
                     fig_fx.add_trace(trace_fx_mediana)
 
                     fig_fx.update_layout(
-                        xaxis=dict(title="Fecha", gridcolor="#1e293b", fixedrange=False),
+                        xaxis=dict(title="Fecha", gridcolor="#1e293b", fixedrange=False, range=[fechas_hist_fx[0], fechas_futuras_fx[-1]]),
                         yaxis=dict(title=f"Tasa ({base_curr}/{target_curr})", gridcolor="#1e293b", fixedrange=False, autorange=True),
                         template="plotly_dark", paper_bgcolor="#020617", plot_bgcolor="#020617",
                         height=550, dragmode="pan", hovermode="x unified",
