@@ -184,11 +184,24 @@ st.markdown(
         line-height: 1.6;
     }
     
-    .source-note {
+    /* Tarjeta de métrica con nota integrada DENTRO */
+    .metric-card-custom {
+        background: #0f172a;
+        border: 1px solid rgba(56, 189, 248, 0.15);
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .metric-label { color: #94a3b8; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+    .metric-val { color: #38bdf8; font-size: 1.5rem; font-weight: 700; margin-bottom: 10px; }
+    .metric-source-note {
         font-size: 0.72rem;
         color: #94a3b8;
-        margin-top: 8px;
-        padding-top: 6px;
+        padding-top: 8px;
         border-top: 1px solid rgba(148, 163, 184, 0.15);
         font-style: italic;
     }
@@ -475,37 +488,103 @@ with tab_acciones:
 
                     st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
                     
-                    # 9 Tarjetas con sus Notas integradas DENTRO de los recuadros
+                    # 9 Tarjetas con notas integradas 100% DENTRO de los recuadros usando HTML personalizado
                     c_m1, c_m2, c_m3, c_m4, c_m5 = st.columns(5)
                     with c_m1:
-                        st.metric(f"Precio Actual ({simbolo_moneda})", f"{simbolo_moneda} {precio_actual:,.2f}")
-                        st.markdown(f"<div class='source-note'>Nota: Yahoo Finance / Spot ({moneda_base_ticker})</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Precio Actual ({simbolo_moneda})</div>
+                                <div class="metric-val">{simbolo_moneda} {precio_actual:,.2f}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Yahoo Finance / Spot ({moneda_base_ticker})</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_m2:
-                        st.metric("Tipo de Cambio Spot", f"{tasa_conv_real:,.4f}")
-                        st.markdown(f"<div class='source-note'>Nota: {fuente_tasa}</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Tipo de Cambio Spot</div>
+                                <div class="metric-val">{tasa_conv_real:,.4f}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: {fuente_tasa}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_m3:
-                        st.metric("PER (Price / Earnings)", f"{pe_ratio}")
-                        st.markdown("<div class='source-note'>Nota: Yahoo Finance Fundamentals</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">PER (Price / Earnings)</div>
+                                <div class="metric-val">{pe_ratio}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Yahoo Finance Fundamentals</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_m4:
-                        st.metric("Volatilidad Anualizada", f"{volatilidad_anualizada:.2%}")
-                        st.markdown("<div class='source-note'>Nota: Modelo GBM Estocástico (5A)</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Volatilidad Anualizada</div>
+                                <div class="metric-val">{volatilidad_anualizada:.2%}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Modelo GBM Estocástico (5A)</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_m5:
-                        st.metric("Margen Beneficio Neto", f"{margin_str}")
-                        st.markdown("<div class='source-note'>Nota: Estados Financieros YF</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Margen Beneficio Neto</div>
+                                <div class="metric-val">{margin_str}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Estados Financieros YF</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
                     c_m6, c_m7, c_m8, c_m9 = st.columns(4)
                     with c_m6:
-                        st.metric(f"Cap. de Mercado ({simbolo_moneda})", f"{simbolo_moneda} {market_cap:,.0f}" if market_cap > 0 else "No reportado")
-                        st.markdown("<div class='source-note'>Nota: Capitalización Bursátil YF</div>", unsafe_allow_html=True)
+                        market_cap_str = f"{simbolo_moneda} {market_cap:,.0f}" if market_cap > 0 else "No reportado"
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Cap. de Mercado ({simbolo_moneda})</div>
+                                <div class="metric-val">{market_cap_str}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Capitalización Bursátil YF</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_m7:
-                        st.metric("Ratio P/B", f"{pb_ratio}")
-                        st.markdown("<div class='source-note'>Nota: Balance General Consolidado</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Ratio P/B</div>
+                                <div class="metric-val">{pb_ratio}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Balance General Consolidado</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_m8:
-                        st.metric("Rendimiento Dividendo", f"{dividend_str}")
-                        st.markdown("<div class='source-note'>Nota: Historial de Dividendos YF</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Rendimiento Dividendo</div>
+                                <div class="metric-val">{dividend_str}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Historial de Dividendos YF</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_m9:
-                        st.metric("VaR 95% Diarios", f"{var_diario_95:.2%}")
-                        st.markdown("<div class='source-note'>Nota: Simulación VaR Histórico</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">VaR 95% Diarios</div>
+                                <div class="metric-val">{var_diario_95:.2%}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Simulación VaR Histórico</div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
                     st.markdown("---")
 
@@ -667,33 +746,93 @@ with tab_forex:
                     diferencial_tasas = tasa_base_ref - tasa_target_ref
 
                     st.markdown(f"### 📊 Panel de Indicadores Clave & Tasas de Referencia - {base_curr}/{target_curr}")
+                    
+                    # 8 Tarjetas FX con notas integradas 100% DENTRO de los recuadros
                     c_x1, c_x2, c_x3, c_x4 = st.columns(4)
                     with c_x1:
-                        st.metric("Tipo de Cambio Spot", f"{rate_actual:,.4f}")
-                        st.markdown("<div class='source-note'>Nota: Yahoo Finance FX Interbank</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Tipo de Cambio Spot</div>
+                                <div class="metric-val">{rate_actual:,.4f}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Yahoo Finance FX Interbank</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_x2:
-                        st.metric(f"Tasa Ref. {base_curr} (Central)", f"{tasa_base_ref:.2f}%")
-                        st.markdown("<div class='source-note'>Nota: Banco Central Base</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Tasa Ref. {base_curr} (Central)</div>
+                                <div class="metric-val">{tasa_base_ref:.2f}%</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Banco Central Base</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_x3:
-                        st.metric(f"Tasa Ref. {target_curr} (Central)", f"{tasa_target_ref:.2f}%")
-                        st.markdown("<div class='source-note'>Nota: Banco Central Destino</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Tasa Ref. {target_curr} (Central)</div>
+                                <div class="metric-val">{tasa_target_ref:.2f}%</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Banco Central Destino</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_x4:
-                        st.metric("Diferencial de Tasas", f"{diferencial_tasas:+.2f}%")
-                        st.markdown("<div class='source-note'>Nota: Paridad de Tasas de Interés</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Diferencial de Tasas</div>
+                                <div class="metric-val">{diferencial_tasas:+.2f}%</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Paridad de Tasas de Interés</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
                     c_x5, c_x6, c_x7, c_x8 = st.columns(4)
                     with c_x5:
-                        st.metric("Monto Convertido", f"{monto_fx * rate_actual:,.2f} {target_curr}")
-                        st.markdown("<div class='source-note'>Nota: Cálculo Spot Actualizado</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Monto Convertido</div>
+                                <div class="metric-val">{monto_fx * rate_actual:,.2f} {target_curr}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Cálculo Spot Actualizado</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_x6:
-                        st.metric("Volatilidad Anualizada", f"{volatilidad_fx:.2%}")
-                        st.markdown("<div class='source-note'>Nota: Desviación Estándar 5A FX</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Volatilidad Anualizada</div>
+                                <div class="metric-val">{volatilidad_fx:.2%}</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Desviación Estándar 5A FX</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_x7:
-                        st.metric("Variación Histórica 5A", f"{variacion_5y:+.2f}%")
-                        st.markdown("<div class='source-note'>Nota: Retorno Histórico Quinquenal</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Variación Histórica 5A</div>
+                                <div class="metric-val">{variacion_5y:+.2f}%</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Retorno Histórico Quinquenal</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with c_x8:
-                        st.metric("Spread Cambiario Est.", "0.15%")
-                        st.markdown("<div class='source-note'>Nota: Costo Promedio Interbancario</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="metric-card-custom">
+                            <div>
+                                <div class="metric-label">Spread Cambiario Est.</div>
+                                <div class="metric-val">0.15%</div>
+                            </div>
+                            <div class="metric-source-note">Nota: Costo Promedio Interbancario</div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
                     st.markdown("---")
 
@@ -777,9 +916,10 @@ with tab_forex:
                         json_fx = {
                             "diagnostico": f"La paridad {base_curr}/{target_curr} opera en {rate_actual:,.4f} con una volatilidad anualizada del {volatilidad_fx:.2%}. El diferencial de tasas de referencia ({diferencial_tasas:+.2f}%) condiciona directamente la dirección de los flujos cambiarios de corto plazo.",
                             "viabilidad": f"Para el propósito de {proposito_fx} con un monto de {monto_fx} {base_curr}, la aplicación evalúa un spread operativo estimado de 0.15%, determinando que el timing actual es óptimo para posiciones tácticas.",
-                            "riesgos": "1. Cambios en la orientación de la política monetaria de la FED y su repercusión en el DXY.\n2. Variaciones en la balanza comercial y precios de materias primas regionales.\n3. Presiones de liquidez estacional en el mercado interbancario de divisas.",
-                            "posicionamiento": "Se recomienda el uso de contratos a término (forwards) o coberturas parciales (options collar) para blindar el flujo de caja operativo ante la volatilidad esperada.",
-                            "resumen_ejecutivo": f"Estrategia Direccional FX: Basado en el diferencial de tasas del {diferencial_tasas:+.2f}% y la volatilidad del {volatilidad_fx:.2%}, se proyecta una tendencia de {'fortalecimiento' if diferencial_tasas > 0 else 'debilitamiento'}. Se recomienda **comprar** la divisa objetivo de forma escalonada (dolarización/conversión táctica) para proteger el capital ante episodios de volatilidad global, respaldando parte de los fondos en monedas estables como el Dólar (USD) o el Franco Suizo (CHF)."
+                            "riesgos": "1. Cambios inminentes en la orientación de la política monetaria de la FED y su impacto directo en el DXY.\n2. Fluctuaciones cíclicas en la balanza comercial y términos de intercambio regional.\n3. Presiones de liquidez estacional en los mercados interbancarios globales.",
+                            "posicionamiento": "Se recomienda el establecimiento de coberturas tácticas mediante contratos forward u opciones collar para mitigar la volatilidad cambiaria.",
+                            "veredicto": "FORTALECIMIENTO" if diferencial_tasas > 0 else "DEBILITAMIENTO",
+                            "resumen_ejecutivo": f"Estrategia Direccional FX: Ante un diferencial de tasas del {diferencial_tasas:+.2f}% y una volatilidad anualizada del {volatilidad_fx:.2%}, se proyecta un escenario de {'fortalecimiento' if diferencial_tasas > 0 else 'debilitamiento'} para el horizonte evaluado. Se aconseja posicionarse de forma táctica y diversificar los remanentes en monedas refugio estables como el Dólar Estadounidense (USD) o el Franco Suizo (CHF)."
                         }
 
                     col_fx_c1, col_fx_c2, col_fx_c3, col_fx_c4 = st.columns(4)
