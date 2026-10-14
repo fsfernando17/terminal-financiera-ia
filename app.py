@@ -354,11 +354,11 @@ MERCADOS = {
     },
     "Shanghai & Hong Kong Stock Exchange (China)": {
         "0700.HK": "Tencent Holdings", "9988.HK": "Alibaba Group Holding", 
-        "600519.SS": "Kweichow Moutai", "0388.HK": "HKEX", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+        "600519.SS": "Kweichow Moutai", "0388.HK": "HKEX", "🔍 Buscar otro Ticker manually": "CUSTOM"
     },
     "Moscow Exchange (MOEX - Rusia)": {
         "GAZP.ME": "Gazprom PJSC", "SBER.ME": "Sberbank of Russia", 
-        "LKOH.ME": "Lukoil PJSC", "ROSN.ME": "Rosneft PJSC", "🔍 Buscar otro Ticker manualmente": "CUSTOM"
+        "LKOH.ME": "Lukoil PJSC", "ROSN.ME": "Rosneft PJSC", "🔍 Buscar otro Ticker manually": "CUSTOM"
     },
     "Euronext & Bolsa de Frankfurt (Europa)": {
         "ASML.AS": "ASML Holding N.V. (Países Bajos)", "SAP.DE": "SAP SE (Alemania)", 
@@ -476,7 +476,6 @@ with tab_acciones:
                     moneda_base_ticker = info_stock.get("currency", "USD")
                     tasa_conv_real, fuente_tasa = obtener_tipo_cambio_real(moneda_base_ticker, moneda_sel)
 
-                    # EXTRACCIÓN DINÁMICA DE PRECIO ACTUAL EN TIEMPO REAL (COINCIDE EXACTO CON GOOGLE/YAHOO FINANCE)
                     precio_actual = 0.0
                     try:
                         fast_inf = objeto_stock.fast_info
@@ -500,7 +499,6 @@ with tab_acciones:
                         market_cap_raw = 5.2e12
                     market_cap = market_cap_raw * tasa_conv_real if market_cap_raw else (precio_actual * 2.5e9)
                     
-                    # FUNDAMENTALES DINÁMICOS REALES (EVITA VALORES ESTÁTICOS Y GARANTIZA COINCIDENCIA)
                     pe_ratio_val = info_stock.get("trailingPE") or info_stock.get("forwardPE")
                     if not pe_ratio_val and ticker_final == "AAPL":
                         pe_ratio_val = 39.12
@@ -630,11 +628,14 @@ with tab_acciones:
 
                     st.markdown(f"### 📈 Comportamiento Histórico & Proyección GBM Monte Carlo ({horizonte})")
                     dias_proyeccion = 60 if "1 a 3 meses" in horizonte else (180 if "6 meses a 1 año" in horizonte else 365)
-                    mediana_mc, p10_mc, p90_mc = simular_monte_carlo_gbm(precio_actual, df_stock["Retorno_Diario"].dropna(), dias_proyeccion, es_forex=False)
+                    
+                    # CORRECCIÓN EXACTA DE EMPALME: USAMOS EL ÚLTIMO PRECIO REAL Y LA FECHA DE CIERRE HISTÓRICO
+                    ultimo_precio_real = float(df_stock["Close_Moneda"].dropna().iloc[-1])
+                    mediana_mc, p10_mc, p90_mc = simular_monte_carlo_gbm(ultimo_precio_real, df_stock["Retorno_Diario"].dropna(), dias_proyeccion, es_forex=False)
                     
                     fechas_historicas = df_stock.index
                     precios_historicos = df_stock["Close_Moneda"]
-                    fechas_futuras = pd.date_range(start=df_stock.index[-1], periods=dias_proyeccion + 1, freq="B")
+                    fechas_futuras = pd.date_range(start=fechas_historicas[-1], periods=dias_proyeccion + 1, freq="B")
 
                     fig_stock = go.Figure()
                     
@@ -885,10 +886,13 @@ with tab_forex:
 
                     st.markdown(f"### 📈 Proyección GBM Monte Carlo Acotada ({horizonte_fx})")
                     dias_proy_fx = 60 if "1 a 3 meses" in horizonte_fx else (180 if "6 meses a 1 año" in horizonte_fx else 365)
-                    mediana_fx, p10_fx, p90_fx = simular_monte_carlo_gbm(rate_actual, df_fx["Retorno_Diario"].dropna(), dias_proy_fx, es_forex=True)
+                    
+                    # EMPALME EXACTO TAMBIÉN PARA FOREX
+                    ultimo_rate_real = float(df_fx["Close"].dropna().iloc[-1])
+                    mediana_fx, p10_fx, p90_fx = simular_monte_carlo_gbm(ultimo_rate_real, df_fx["Retorno_Diario"].dropna(), dias_proy_fx, es_forex=True)
                     
                     fechas_hist_fx = df_fx.index
-                    fechas_futuras_fx = pd.date_range(start=df_fx.index[-1], periods=dias_proy_fx + 1, freq="B")
+                    fechas_futuras_fx = pd.date_range(start=fechas_hist_fx[-1], periods=dias_proy_fx + 1, freq="B")
 
                     fig_fx = go.Figure()
                     
