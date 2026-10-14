@@ -184,6 +184,7 @@ st.markdown(
         line-height: 1.6;
     }
     
+    /* Tarjeta de métrica con nota integrada DENTRO */
     .metric-card-custom {
         background: #0f172a;
         border: 1px solid rgba(56, 189, 248, 0.15);
@@ -382,12 +383,12 @@ def obtener_tipo_cambio_real(moneda_base_ticker, moneda_destino_key):
         paridad_ticker = f"{base_limpia}{target_limpio}=X"
         df_fx = yf.Ticker(paridad_ticker).history(period="5d")
         if not df_fx.empty:
-            return float(df_fx["Close"].iloc[-1]), f"Yahoo Finance Spot ({paridad_ticker})"
+            return float(df_fx["Close"].dropna().iloc[-1]), f"Yahoo Finance Spot ({paridad_ticker})"
             
         paridad_inversa = f"{target_limpio}{base_limpia}=X"
         df_inv = yf.Ticker(paridad_inversa).history(period="5d")
         if not df_inv.empty:
-            val_inv = float(df_inv["Close"].iloc[-1])
+            val_inv = float(df_inv["Close"].dropna().iloc[-1])
             if val_inv > 0:
                 return (1.0 / val_inv), f"Yahoo Finance Spot Inverso ({paridad_inversa})"
     except Exception:
@@ -395,6 +396,17 @@ def obtener_tipo_cambio_real(moneda_base_ticker, moneda_destino_key):
     
     tasa_def = TASAS_CAMBIO_USD.get(moneda_destino_key, 1.0)
     return tasa_def, "Tasa Institucional de Referencia / Banco Central"
+
+def obtener_historial_forex(base_curr, target_curr):
+    paridad = f"{base_curr}{target_curr}=X"
+    df = yf.Ticker(paridad).history(period="5y")
+    if df.empty:
+        paridad_inv = f"{target_curr}{base_curr}=X"
+        df_inv = yf.Ticker(paridad_inv).history(period="5y")
+        if not df_inv.empty:
+            df_inv["Close"] = 1.0 / df_inv["Close"]
+            return df_inv
+    return df
 
 # ==============================================================================
 # ENCABEZADO Y TABS DE NAVEGACIÓN INSTITUCIONAL
@@ -469,7 +481,8 @@ with tab_acciones:
                     moneda_base_ticker = info_stock.get("currency", "USD")
                     tasa_conv_real, fuente_tasa = obtener_tipo_cambio_real(moneda_base_ticker, moneda_sel)
 
-                    precio_actual = float(df_stock["Close"].iloc[-1]) * tasa_conv_real
+                    serie_precios = df_stock["Close"].dropna()
+                    precio_actual = float(serie_precios.iloc[-1]) * tasa_conv_real if not serie_precios.empty else 0.0
                     df_stock["Close_Moneda"] = df_stock["Close"] * tasa_conv_real
                     
                     market_cap_raw = info_stock.get("marketCap")
@@ -487,7 +500,7 @@ with tab_acciones:
 
                     st.markdown("### 📊 Panel de Indicadores Clave & Fundamentos (5 Años)")
                     
-                    # 9 Tarjetas con notas integradas 100% DENTRO de los recuadros
+                    # 9 Tarjetas con notas integradas 100% DENTRO de los recuadros usando HTML personalizado
                     c_m1, c_m2, c_m3, c_m4, c_m5 = st.columns(5)
                     with c_m1:
                         st.markdown(f"""
@@ -735,10 +748,11 @@ with tab_forex:
                     st.error(f"⚠️ El historial para la paridad {base_curr}/{target_curr} no está disponible.")
                 else:
                     datos_fx_cargados = True
-                    rate_actual = float(df_fx["Close"].iloc[-1])
+                    serie_fx_cierre = df_fx["Close"].dropna()
+                    rate_actual = float(serie_fx_cierre.iloc[-1]) if not serie_fx_cierre.empty else 1.0
                     df_fx["Retorno_Diario"] = df_fx["Close"].pct_change()
                     volatilidad_fx = df_fx["Retorno_Diario"].std() * np.sqrt(252)
-                    variacion_5y = ((rate_actual - df_fx["Close"].iloc[0]) / df_fx["Close"].iloc[0]) * 100
+                    variacion_5y = ((rate_actual - serie_fx_cierre.iloc[0]) / serie_fx_cierre.iloc[0]) * 100 if not serie_fx_cierre.empty else 0.0
 
                     tasa_base_ref = TASAS_REFERENCIA_PAIS.get(base_curr, 4.50)
                     tasa_target_ref = TASAS_REFERENCIA_PAIS.get(target_curr, 4.50)
